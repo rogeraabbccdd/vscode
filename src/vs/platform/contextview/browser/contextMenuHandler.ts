@@ -24,7 +24,8 @@ export interface IContextMenuHandlerOptions {
 }
 
 export class ContextMenuHandler {
-	private focusToReturn: HTMLElement;
+	private focusToReturn: HTMLElement | null;
+	private visible: boolean = false;
 	private block: HTMLElement | null;
 	private options: IContextMenuHandlerOptions = { blockMouse: true };
 
@@ -40,6 +41,10 @@ export class ContextMenuHandler {
 		this.options = options;
 	}
 
+	isVisible(): boolean {
+		return this.visible;
+	}
+
 	showContextMenu(delegate: IContextMenuDelegate): void {
 		const actions = delegate.getActions();
 		if (!actions.length) {
@@ -47,6 +52,7 @@ export class ContextMenuHandler {
 		}
 
 		this.focusToReturn = document.activeElement as HTMLElement;
+		this.visible = true;
 
 		let menu: Menu | undefined;
 
@@ -125,7 +131,10 @@ export class ContextMenuHandler {
 
 				if (this.focusToReturn) {
 					this.focusToReturn.focus();
+					this.focusToReturn = null;
 				}
+
+				this.visible = false;
 			}
 		});
 	}

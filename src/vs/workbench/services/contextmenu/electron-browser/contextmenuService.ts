@@ -59,6 +59,10 @@ export class ContextMenuService extends Disposable implements IContextMenuServic
 	showContextMenu(delegate: IContextMenuDelegate): void {
 		this.impl.showContextMenu(delegate);
 	}
+
+	isVisible(): boolean {
+		return this.impl.isVisible();
+	}
 }
 
 class NativeContextMenuService extends Disposable implements IContextMenuService {
@@ -68,12 +72,18 @@ class NativeContextMenuService extends Disposable implements IContextMenuService
 	private _onDidContextMenu = this._register(new Emitter<void>());
 	get onDidContextMenu(): Event<void> { return this._onDidContextMenu.event; }
 
+	private visible = false;
+
 	constructor(
 		@INotificationService private readonly notificationService: INotificationService,
 		@ITelemetryService private readonly telemetryService: ITelemetryService,
 		@IKeybindingService private readonly keybindingService: IKeybindingService
 	) {
 		super();
+	}
+
+	isVisible(): boolean {
+		return this.visible;
 	}
 
 	showContextMenu(delegate: IContextMenuDelegate): void {
@@ -85,6 +95,8 @@ class NativeContextMenuService extends Disposable implements IContextMenuService
 				}
 
 				this._onDidContextMenu.fire();
+
+				this.visible = false;
 			});
 
 			const menu = this.createMenu(delegate, actions, onHide);
@@ -112,6 +124,8 @@ class NativeContextMenuService extends Disposable implements IContextMenuService
 				positioningItem: delegate.autoSelectFirstItem ? 0 : undefined,
 				onHide: () => onHide()
 			});
+
+			this.visible = true;
 		}
 	}
 
