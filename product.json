@@ -1,7 +1,7 @@
 {
 	"nameShort": "Code - OSS",
-	"nameLong": "Code - OSS",
-	"applicationName": "code-oss",
+	"nameLong": "Code",
+	"applicationName": "code",
 	"dataFolderName": ".vscode-oss",
 	"win32MutexName": "vscodeoss",
 	"licenseName": "MIT",
@@ -22,5 +22,10 @@
 	"urlProtocol": "code-oss",
 	"extensionAllowedProposedApi": [
 		"ms-vscode.references-view"
-	]
+	],
+	"extensionsGallery": {
+		"serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
+		"cacheUrl": "https://vscode.blob.core.windows.net/gallery/index",
+		"itemUrl": "https://marketplace.visualstudio.com/items"
+	}
 }
