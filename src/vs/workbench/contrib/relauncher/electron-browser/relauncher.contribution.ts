@@ -15,7 +15,7 @@ import { IExtensionService } from 'vs/workbench/services/extensions/common/exten
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { URI } from 'vs/base/common/uri';
 import { isEqual } from 'vs/base/common/resources';
-import { isLinux, isMacintosh, isWindows } from 'vs/base/common/platform';
+import { isLinux, isMacintosh } from 'vs/base/common/platform';
 import { LifecyclePhase } from 'vs/platform/lifecycle/common/lifecycle';
 import { IDialogService } from 'vs/platform/dialogs/common/dialogs';
 import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/common/environmentService';
@@ -25,13 +25,12 @@ interface IConfiguration extends IWindowsConfiguration {
 	telemetry: { enableCrashReporter: boolean };
 	keyboard: { touchbar: { enabled: boolean } };
 	workbench: { list: { horizontalScrolling: boolean }, useExperimentalGridLayout: boolean };
+	debug: { console: { wordWrap: boolean } };
 }
 
 export class SettingsChangeRelauncher extends Disposable implements IWorkbenchContribution {
 
 	private transparent: boolean;
-	private compositionAttribute: 'none' | 'transparent' | 'blur' | 'acrylic';
-	private vibrancy: 'none' | 'appearance-based' | 'light' | 'dark' | 'titlebar' | 'medium-light' | 'ultra-dark';
 	private titleBarStyle: 'native' | 'custom';
 	private nativeTabs: boolean;
 	private nativeFullScreen: boolean;
@@ -41,6 +40,7 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 	private touchbarEnabled: boolean;
 	private treeHorizontalScrolling: boolean;
 	private useGridLayout: boolean;
+	private debugConsoleWordWrap: boolean;
 
 	constructor(
 		@IWindowsService private readonly windowsService: IWindowsService,
@@ -61,18 +61,6 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 		// Linux transparency
 		if (isLinux && config.window && typeof config.window.transparent === 'boolean' && config.window.transparent !== this.transparent) {
 			this.transparent = config.window.transparent;
-			changed = true;
-		}
-
-		// Windows Composition Attribute
-		if (isWindows && config.window && config.window.compositionAttribute !== this.compositionAttribute) {
-			this.compositionAttribute = config.window.compositionAttribute;
-			changed = true;
-		}
-
-		// macOS vibrancy
-		if (isMacintosh && config.window && config.window.vibrancy !== this.vibrancy) {
-			this.vibrancy = config.window.vibrancy;
 			changed = true;
 		}
 
@@ -127,6 +115,12 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 		// Workbench Grid Layout
 		if (config.workbench && typeof config.workbench.useExperimentalGridLayout === 'boolean' && config.workbench.useExperimentalGridLayout !== this.useGridLayout) {
 			this.useGridLayout = config.workbench.useExperimentalGridLayout;
+			changed = true;
+		}
+
+		// Debug console word wrap
+		if (config.debug && typeof config.debug.console.wordWrap === 'boolean' && config.debug.console.wordWrap !== this.debugConsoleWordWrap) {
+			this.debugConsoleWordWrap = config.debug.console.wordWrap;
 			changed = true;
 		}
 

@@ -5,8 +5,8 @@
 
 import 'vs/css!./contextMenuHandler';
 
-import { combinedDisposable, IDisposable } from 'vs/base/common/lifecycle';
-import { ActionRunner, IRunEvent } from 'vs/base/common/actions';
+import { IDisposable, combinedDisposable } from 'vs/base/common/lifecycle';
+import { ActionRunner, IRunEvent, WBActionExecutedEvent, WBActionExecutedClassification } from 'vs/base/common/actions';
 import { Menu } from 'vs/base/browser/ui/menu/menu';
 import { IContextViewService } from 'vs/platform/contextview/browser/contextView';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
@@ -104,7 +104,7 @@ export class ContextMenuHandler {
 					this.contextViewService.hideContextView(true);
 				}, null, menuDisposables);
 
-				return combinedDisposable([...menuDisposables, menu]);
+				return combinedDisposable(...menuDisposables, menu);
 			},
 
 			focus: () => {
@@ -132,13 +132,7 @@ export class ContextMenuHandler {
 
 	private onActionRun(e: IRunEvent): void {
 		if (this.telemetryService) {
-			/* __GDPR__
-				"workbenchActionExecuted" : {
-					"id" : { "classification": "SystemMetaData", "purpose": "FeatureInsight" },
-					"from": { "classification": "SystemMetaData", "purpose": "FeatureInsight" }
-				}
-			*/
-			this.telemetryService.publicLog('workbenchActionExecuted', { id: e.action.id, from: 'contextMenu' });
+			this.telemetryService.publicLog2<WBActionExecutedEvent, WBActionExecutedClassification>('workbenchActionExecuted', { id: e.action.id, from: 'contextMenu' });
 		}
 
 		this.contextViewService.hideContextView(false);

@@ -8,7 +8,6 @@ import * as objects from 'vs/base/common/objects';
 import * as os from 'os';
 import * as nls from 'vs/nls';
 import { URI } from 'vs/base/common/uri';
-import { IStateService } from 'vs/platform/state/common/state';
 import { screen, BrowserWindow, systemPreferences, app, TouchBar, nativeImage, Rectangle, Display } from 'electron';
 import { IEnvironmentService, ParsedArgs } from 'vs/platform/environment/common/environment';
 import { ILogService } from 'vs/platform/log/common/log';
@@ -24,9 +23,9 @@ import { IBackupMainService } from 'vs/platform/backup/common/backup';
 import { ISerializableCommandAction } from 'vs/platform/actions/common/actions';
 import * as perf from 'vs/base/common/performance';
 import { resolveMarketplaceHeaders } from 'vs/platform/extensionManagement/node/extensionGalleryService';
-import { getBackgroundColor, setBackgroundColor } from 'vs/code/electron-main/theme';
-import { RunOnceScheduler } from 'vs/base/common/async';
+import { IThemeMainService } from 'vs/platform/theme/electron-main/themeMainService';
 import { endsWith } from 'vs/base/common/strings';
+import { RunOnceScheduler } from 'vs/base/common/async';
 
 export interface IWindowCreationOptions {
 	state: IWindowState;
@@ -85,7 +84,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		@ILogService private readonly logService: ILogService,
 		@IEnvironmentService private readonly environmentService: IEnvironmentService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
-		@IStateService private readonly stateService: IStateService,
+		@IThemeMainService private readonly themeMainService: IThemeMainService,
 		@IWorkspacesMainService private readonly workspacesMainService: IWorkspacesMainService,
 		@IBackupMainService private readonly backupMainService: IBackupMainService,
 	) {
@@ -112,28 +111,21 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		this.registerListeners();
 	}
 
-	private setTransparentInfo(options: Electron.BrowserWindowConstructorOptions): void {
-		options.backgroundColor = '#00000000';
-		setBackgroundColor(this.stateService, 'transparent');
-	}
-
 	private createBrowserWindow(config: IWindowCreationOptions): void {
 
 		// Load window state
-		this.windowState = this.restoreWindowState(config.state);
-
-		// in case we are maximized or fullscreen, only show later after the call to maximize/fullscreen (see below)
-		const isFullscreenOrMaximized = (this.windowState.mode === WindowMode.Maximized || this.windowState.mode === WindowMode.Fullscreen);
+		const [state, hasMultipleDisplays] = this.restoreWindowState(config.state);
+		this.windowState = state;
 
 		const options: Electron.BrowserWindowConstructorOptions = {
 			width: this.windowState.width,
 			height: this.windowState.height,
 			x: this.windowState.x,
 			y: this.windowState.y,
-			backgroundColor: getBackgroundColor(this.stateService),
+			backgroundColor: this.themeMainService.getBackgroundColor(),
 			minWidth: CodeWindow.MIN_WIDTH,
 			minHeight: CodeWindow.MIN_HEIGHT,
-			show: !isFullscreenOrMaximized,
+			show: false,
 			title: product.nameLong,
 			webPreferences: {
 				// By default if Code is in the background, intervals and timeouts get throttled, so we
@@ -144,21 +136,26 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			}
 		};
 
+<<<<<<< HEAD
 		const windowConfig = this.configurationService.getValue<IWindowSettings>('window');
 
+=======
+>>>>>>> swca
 		if (isLinux) {
 			options.icon = path.join(this.environmentService.appRoot, 'resources/linux/code.png'); // Windows and Mac are better off using the embedded icon(s)
 
 			// Make sure hardware acceleration is actually disabled.
-			options.transparent = windowConfig && windowConfig.transparent && app.getGPUFeatureStatus().gpu_compositing !== 'enabled';
-			if (options.transparent) {
-				this.setTransparentInfo(options);
-			}
+			//options.transparent = windowConfig && windowConfig.transparent && app.getGPUFeatureStatus().gpu_compositing !== 'enabled';
+			//if (options.transparent) {
+			//	options.backgroundColor = '#00000000';
+			//}
 		}
 
 		if (isMacintosh && !this.useNativeFullScreen()) {
 			options.fullscreenable = false; // enables simple fullscreen mode
 		}
+
+		const windowConfig = this.configurationService.getValue<IWindowSettings>('window');
 
 		if (isMacintosh) {
 			options.acceptFirstMouse = true; // enabled by default
@@ -168,7 +165,8 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			}
 		}
 
-		if (isMacintosh && windowConfig && windowConfig.nativeTabs === true) {
+		const useNativeTabs = isMacintosh && windowConfig && windowConfig.nativeTabs === true;
+		if (useNativeTabs) {
 			options.tabbingIdentifier = product.nameShort; // this opts in to sierra tabs
 		}
 
@@ -181,19 +179,6 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			}
 		}
 
-		if (isMacintosh && windowConfig && windowConfig.vibrancy && windowConfig.vibrancy !== 'none') {
-			this.setTransparentInfo(options);
-			options.vibrancy = windowConfig.vibrancy;
-		}
-
-		const needsWinTransparency =
-			isWindows && windowConfig && windowConfig.compositionAttribute &&
-			windowConfig.compositionAttribute !== 'none' && parseFloat(os.release()) >= 10 &&
-			useCustomTitleStyle;
-		if (needsWinTransparency) {
-			this.setTransparentInfo(options);
-		}
-
 		// Create the browser window.
 		this._win = new BrowserWindow(options);
 		this._id = this._win.id;
@@ -202,42 +187,88 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			this._win.setSheetOffset(22); // offset dialogs by the height of the custom title bar if we have any
 		}
 
-		if (needsWinTransparency) {
-			const { ACCENT_STATE, SetWindowCompositionAttribute } = require.__$__nodeRequire('windows-swca');
-			let attribValue = ACCENT_STATE.ACCENT_DISABLED;
-			switch (windowConfig.compositionAttribute) {
-				case 'acrylic':
-					// Fluent/acrylic flag was introduced in Windows 10 build 17063 (between FCU and April 2018 update)
-					if (parseInt(os.release().split('.')[2]) >= 17063) {
-						attribValue = ACCENT_STATE.ACCENT_ENABLE_ACRYLICBLURBEHIND;
-					}
-					break;
+		this.applyTransparency(windowConfig);
 
-				case 'blur':
-					attribValue = ACCENT_STATE.ACCENT_ENABLE_BLURBEHIND;
-					break;
-
-				case 'transparent':
-					attribValue = ACCENT_STATE.ACCENT_ENABLE_TRANSPARENTGRADIENT;
-					break;
+		// TODO@Ben (Electron 4 regression): when running on multiple displays where the target display
+		// to open the window has a larger resolution than the primary display, the window will not size
+		// correctly unless we set the bounds again (https://github.com/microsoft/vscode/issues/74872)
+		//
+		// However, when running with native tabs with multiple windows we cannot use this workaround
+		// because there is a potential that the new window will be added as native tab instead of being
+		// a window on its own. In that case calling setBounds() would cause https://github.com/microsoft/vscode/issues/75830
+		if (isMacintosh && hasMultipleDisplays && (!useNativeTabs || BrowserWindow.getAllWindows().length === 1)) {
+			if ([this.windowState.width, this.windowState.height, this.windowState.x, this.windowState.y].every(value => typeof value === 'number')) {
+				this._win.setBounds({
+					width: this.windowState.width!,
+					height: this.windowState.height!,
+					x: this.windowState.x!,
+					y: this.windowState.y!
+				});
 			}
-
-			SetWindowCompositionAttribute(this._win.getNativeWindowHandle(), attribValue, 0);
 		}
 
-		if (isFullscreenOrMaximized) {
+		if (this.windowState.mode === WindowMode.Maximized) {
 			this._win.maximize();
-
-			if (this.windowState.mode === WindowMode.Fullscreen) {
-				this.setFullScreen(true);
-			}
-
-			if (!this._win.isVisible()) {
-				this._win.show(); // to reduce flicker from the default window size to maximize, we only show after maximize
-			}
+		} else if (this.windowState.mode === WindowMode.Fullscreen) {
+			this.setFullScreen(true);
 		}
+
+		// to reduce flicker from the default window size to maximize, we only show after maximize
+		// also prevents temporary background flash when transparency is set.
+		this._win.show();
 
 		this._lastFocusTime = Date.now(); // since we show directly, we need to set the last focus time too
+	}
+
+	private setCompositionAttribute(attribute: 'acrylic' | 'blur' | 'transparent' | 'none'): void {
+		const { ACCENT_STATE, SetWindowCompositionAttribute } = require.__$__nodeRequire('windows-swca');
+		let attribValue = ACCENT_STATE.ACCENT_DISABLED;
+		switch (attribute) {
+			case 'acrylic':
+				// Fluent/acrylic flag was introduced in Windows 10 build 17063 (between FCU and April 2018 update)
+				if (parseInt(os.release().split('.')[2]) >= 17063) {
+					attribValue = ACCENT_STATE.ACCENT_ENABLE_ACRYLICBLURBEHIND;
+				}
+				break;
+
+			case 'blur':
+				attribValue = ACCENT_STATE.ACCENT_ENABLE_BLURBEHIND;
+				break;
+
+			case 'transparent':
+				attribValue = ACCENT_STATE.ACCENT_ENABLE_TRANSPARENTGRADIENT;
+				break;
+		}
+
+		SetWindowCompositionAttribute(this._win.getNativeWindowHandle(), attribValue, 0);
+	}
+
+	private applyTransparency(windowConfig: IWindowSettings): void {
+		let applied = false;
+
+		if (windowConfig) {
+			if (isWindows && parseFloat(os.release()) >= 10) {
+				if (windowConfig.compositionAttribute && windowConfig.compositionAttribute !== 'none' && this.hasHiddenTitleBarStyle()) {
+					this.setCompositionAttribute(windowConfig.compositionAttribute);
+					applied = true;
+				} else {
+					this.setCompositionAttribute('none');
+				}
+			} else if (isMacintosh && parseFloat(os.release()) >= 14) {
+				if (windowConfig.vibrancy && windowConfig.vibrancy !== 'none') {
+					this._win.setVibrancy(windowConfig.vibrancy);
+					applied = true;
+				} else {
+					// Documentation says to pass null to remove vibrancy but this is not reflected in the typings
+					this._win.setVibrancy(null as any);
+				}
+			} else if (isLinux) {
+				// TODO
+			}
+		}
+
+		// FIXME: on windows, background is pitchblack at startup until the user changes the composition attribute in settings
+		this._win.setBackgroundColor(applied ? '#00000000' : this.themeMainService.getBackgroundColor());
 	}
 
 	hasHiddenTitleBarStyle(): boolean {
@@ -251,12 +282,6 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 	get isExtensionTestHost(): boolean {
 		return !!this.config.extensionTestsPath;
 	}
-
-	/*
-	get extensionDevelopmentPaths(): string | string[] | undefined {
-		return this.config.extensionDevelopmentPath;
-	}
-	*/
 
 	get config(): IWindowConfiguration {
 		return this.currentConfig;
@@ -351,7 +376,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		const urls = ['https://marketplace.visualstudio.com/*', 'https://*.vsassets.io/*'];
 		this._win.webContents.session.webRequest.onBeforeSendHeaders({ urls }, (details, cb) => {
 			this.marketplaceHeadersPromise.then(headers => {
-				const requestHeaders = objects.assign(details.requestHeaders, headers);
+				const requestHeaders = objects.assign(details.requestHeaders, headers) as { [key: string]: string | undefined };
 				if (!this.configurationService.getValue('extensions.disableExperimentalAzureSearch')) {
 					requestHeaders['Cookie'] = `${requestHeaders['Cookie'] ? requestHeaders['Cookie'] + ';' : ''}EnableExternalSearchForVSCode=true`;
 				}
@@ -375,12 +400,14 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		});
 
 		this._win.webContents.session.webRequest.onHeadersReceived(null!, (details, callback) => {
-			const contentType: string[] = (details.responseHeaders['content-type'] || details.responseHeaders['Content-Type']);
+			const responseHeaders = details.responseHeaders as { [key: string]: string[] };
+
+			const contentType: string[] = (responseHeaders['content-type'] || responseHeaders['Content-Type']);
 			if (contentType && Array.isArray(contentType) && contentType.some(x => x.toLowerCase().indexOf('image/svg') >= 0)) {
 				return callback({ cancel: true });
 			}
 
-			return callback({ cancel: false, responseHeaders: details.responseHeaders });
+			return callback({ cancel: false, responseHeaders });
 		});
 
 		// Remember that we loaded
@@ -504,6 +531,8 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 				this._win.removeAllListeners('swipe');
 			}
 		}
+
+		this.applyTransparency(this.configurationService.getValue<IWindowSettings>('window'));
 	}
 
 	private registerNavigationListenerOn(command: 'swipe' | 'app-command', back: 'left' | 'browser-backward', forward: 'right' | 'browser-forward', acrossEditors: boolean) {
@@ -723,7 +752,12 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 
 		// only consider non-minimized window states
 		if (mode === WindowMode.Normal || mode === WindowMode.Maximized) {
-			const bounds = this.getBounds();
+			let bounds: Electron.Rectangle;
+			if (mode === WindowMode.Normal) {
+				bounds = this.getBounds();
+			} else {
+				bounds = this._win.getNormalBounds(); // make sure to persist the normal bounds when maximized to be able to restore them
+			}
 
 			state.x = bounds.x;
 			state.y = bounds.y;
@@ -734,18 +768,23 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		return state;
 	}
 
-	private restoreWindowState(state?: IWindowState): IWindowState {
+	private restoreWindowState(state?: IWindowState): [IWindowState, boolean? /* has multiple displays */] {
+		let hasMultipleDisplays = false;
 		if (state) {
 			try {
-				state = this.validateWindowState(state);
+				const displays = screen.getAllDisplays();
+				hasMultipleDisplays = displays.length > 1;
+
+				state = this.validateWindowState(state, displays);
 			} catch (err) {
 				this.logService.warn(`Unexpected error validating window state: ${err}\n${err.stack}`); // somehow display API can be picky about the state to validate
 			}
 		}
-		return state || defaultWindowState();
+
+		return [state || defaultWindowState(), hasMultipleDisplays];
 	}
 
-	private validateWindowState(state: IWindowState): IWindowState | undefined {
+	private validateWindowState(state: IWindowState, displays: Display[]): IWindowState | undefined {
 		if (typeof state.x !== 'number'
 			|| typeof state.y !== 'number'
 			|| typeof state.width !== 'number'
@@ -758,12 +797,10 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			return undefined;
 		}
 
-		const displays = screen.getAllDisplays();
-
 		// Single Monitor: be strict about x/y positioning
 		if (displays.length === 1) {
 			const displayWorkingArea = this.getWorkingArea(displays[0]);
-			if (state.mode !== WindowMode.Maximized && displayWorkingArea) {
+			if (displayWorkingArea) {
 				if (state.x < displayWorkingArea.x) {
 					state.x = displayWorkingArea.x; // prevent window from falling out of the screen to the left
 				}
@@ -787,10 +824,6 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 				if (state.height > displayWorkingArea.height) {
 					state.height = displayWorkingArea.height; // prevent window from exceeding display bounds height
 				}
-			}
-
-			if (state.mode === WindowMode.Maximized) {
-				return defaultWindowState(WindowMode.Maximized); // when maximized, make sure we have good values when the user restores the window
 			}
 
 			return state;
@@ -820,14 +853,6 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			bounds.x + bounds.width > displayWorkingArea.x &&				// prevent window from falling out of the screen to the left
 			bounds.y + bounds.height > displayWorkingArea.y					// prevent window from falling out of the scree nto the top
 		) {
-			if (state.mode === WindowMode.Maximized) {
-				const defaults = defaultWindowState(WindowMode.Maximized); // when maximized, make sure we have good values when the user restores the window
-				defaults.x = state.x; // carefull to keep x/y position so that the window ends up on the correct monitor
-				defaults.y = state.y;
-
-				return defaults;
-			}
-
 			return state;
 		}
 
@@ -901,16 +926,17 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 	}
 
 	private useNativeFullScreen(): boolean {
-		const windowConfig = this.configurationService.getValue<IWindowSettings>('window');
-		if (!windowConfig || typeof windowConfig.nativeFullScreen !== 'boolean') {
-			return true; // default
-		}
+		return true; // TODO@ben enable simple fullscreen again (https://github.com/microsoft/vscode/issues/75054)
+		// const windowConfig = this.configurationService.getValue<IWindowSettings>('window');
+		// if (!windowConfig || typeof windowConfig.nativeFullScreen !== 'boolean') {
+		// 	return true; // default
+		// }
 
-		if (windowConfig.nativeTabs) {
-			return true; // https://github.com/electron/electron/issues/16142
-		}
+		// if (windowConfig.nativeTabs) {
+		// 	return true; // https://github.com/electron/electron/issues/16142
+		// }
 
-		return windowConfig.nativeFullScreen !== false;
+		// return windowConfig.nativeFullScreen !== false;
 	}
 
 	isMinimized(): boolean {
