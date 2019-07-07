@@ -1509,7 +1509,7 @@ export interface EditorReplacement {
 registerThemingParticipant((theme, collector, environment) => {
 
 	// Letterpress
-	const letterpress = `./media/letterpress${theme.type === 'dark' ? '-dark' : theme.type === 'hc' ? '-hc' : ''}.svg`;
+	const letterpress = `./media/code-icon.svg`;
 	collector.addRule(`
 		.monaco-workbench .part.editor > .content .editor-group-container.empty .editor-group-letterpress {
 			background-image: url('${require.toUrl(letterpress)}')
