@@ -188,6 +188,11 @@
 				return;
 			}
 
+			// Prevent middle clicks opening a broken link in the browser
+			if (event.button == 1) {
+				event.preventDefault();
+			}
+
 			let baseElement = event.view.document.getElementsByTagName('base')[0];
 			/** @type {any} */
 			let node = event.target;
@@ -367,7 +372,7 @@
 					// seeing the service worker applying properly.
 					// Fake load an empty on the correct origin and then write real html
 					// into it to get around this.
-					newFrame.src = `/fake.html?id=${ID}`;
+					newFrame.src = `./fake.html?id=${ID}`;
 				}
 				newFrame.style.cssText = 'display: block; margin: 0; overflow: hidden; position: absolute; width: 100%; height: 100%; visibility: hidden';
 				document.body.appendChild(newFrame);
@@ -443,7 +448,7 @@
 					});
 
 					// Bubble out link clicks
-					newFrame.contentWindow.addEventListener('click', handleInnerClick);
+					newFrame.contentWindow.addEventListener('mousedown', handleInnerClick);
 
 					if (host.onIframeLoaded) {
 						host.onIframeLoaded(newFrame);
