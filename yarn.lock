@@ -9829,10 +9829,10 @@ windows-process-tree@0.2.4:
   dependencies:
     nan "^2.13.2"
 
-windows-swca@2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/windows-swca/-/windows-swca-2.0.1.tgz#25d78ce25251292061494a0ad07c02282b28b4e3"
-  integrity sha512-flj+HD6RUemZUvKKguLLnMUOYkQSgDu9qrhUIO4cydvtb/x+sxU8XmpZUtugYuydcdikB9zsCOMgKnAqIQ+7nw==
+windows-swca@2.0.2:
+  version "2.0.2"
+  resolved "https://registry.yarnpkg.com/windows-swca/-/windows-swca-2.0.2.tgz#66807012f73f5d3c0f0cb49bfa61be297aaabb50"
+  integrity sha512-9935KGV1gH3EBy7re9UEfDrxY3fbXBcwrUgEZk1exxe6swcGKFhO82ECh4QXVBjIhq+ROIVW3SBF/OUnZFSNGw==
   dependencies:
     "@types/node" "^10.12.18"
 
