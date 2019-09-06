@@ -63,7 +63,7 @@ export interface IExperiment {
 }
 
 export interface IExperimentService {
-	_serviceBrand: any;
+	_serviceBrand: undefined;
 	getExperimentById(id: string): Promise<IExperiment>;
 	getExperimentsByType(type: ExperimentActionType): Promise<IExperiment[]>;
 	getCuratedExtensionsList(curatedExtensionsKey: string): Promise<string[]>;
@@ -108,7 +108,7 @@ interface IRawExperiment {
 }
 
 export class ExperimentService extends Disposable implements IExperimentService {
-	_serviceBrand: any;
+	_serviceBrand: undefined;
 	private _experiments: IExperiment[] = [];
 	private _loadExperimentsPromise: Promise<void>;
 	private _curatedMapping = Object.create(null);
@@ -169,11 +169,11 @@ export class ExperimentService extends Disposable implements IExperimentService 
 		this.storageService.store(storageKey, JSON.stringify(experimentState), StorageScope.GLOBAL);
 	}
 
-	protected getExperiments(): Promise<IRawExperiment[]> {
-		if (!this.productService.productConfiguration.experimentsUrl || this.configurationService.getValue('workbench.enableExperiments') === false) {
+	protected getExperiments(): Promise<IRawExperiment[] | null> {
+		if (!this.productService.experimentsUrl || this.configurationService.getValue('workbench.enableExperiments') === false) {
 			return Promise.resolve([]);
 		}
-		return this.requestService.request({ type: 'GET', url: this.productService.productConfiguration.experimentsUrl }, CancellationToken.None).then(context => {
+		return this.requestService.request({ type: 'GET', url: this.productService.experimentsUrl }, CancellationToken.None).then(context => {
 			if (context.res.statusCode !== 200) {
 				return Promise.resolve(null);
 			}

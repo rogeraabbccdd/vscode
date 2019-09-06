@@ -30,12 +30,11 @@ interface IExtHostReadyEntry {
 }
 
 export abstract class TerminalService implements ITerminalService {
-	public _serviceBrand: any;
+	public _serviceBrand: undefined;
 
 	protected _isShuttingDown: boolean;
 	protected _terminalFocusContextKey: IContextKey<boolean>;
 	protected _findWidgetVisible: IContextKey<boolean>;
-	protected _terminalContainer: HTMLElement | undefined;
 	protected _terminalTabs: ITerminalTab[] = [];
 	protected _backgroundedTerminalInstances: ITerminalInstance[] = [];
 	protected get _terminalInstances(): ITerminalInstance[] {
@@ -123,7 +122,9 @@ export abstract class TerminalService implements ITerminalService {
 	protected abstract _showBackgroundTerminal(instance: ITerminalInstance): void;
 
 	public abstract createTerminal(shell?: IShellLaunchConfig, wasNewTerminalAction?: boolean): ITerminalInstance;
+	// tslint:disable-next-line: no-dom-globals
 	public abstract createInstance(container: HTMLElement, shellLaunchConfig: IShellLaunchConfig): ITerminalInstance;
+	// tslint:disable-next-line: no-dom-globals
 	public abstract setContainers(panelContainer: HTMLElement, terminalContainer: HTMLElement): void;
 
 	public getActiveOrCreateInstance(wasNewTerminalAction?: boolean): ITerminalInstance {
@@ -567,7 +568,7 @@ export abstract class TerminalService implements ITerminalService {
 			const options: IPickOptions<IQuickPickItem> = {
 				placeHolder: nls.localize('terminal.integrated.chooseWindowsShell', "Select your preferred terminal shell, you can change this later in your settings")
 			};
-			const quickPickItems = shells.map(s => {
+			const quickPickItems = shells.map((s): IQuickPickItem => {
 				return { label: s.label, description: s.path };
 			});
 			return this._quickInputService.pick(quickPickItems, options).then(async value => {

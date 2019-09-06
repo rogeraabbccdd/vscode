@@ -14,7 +14,7 @@ import {
 	IBreakpointsDeltaDto, ISourceMultiBreakpointDto, IFunctionBreakpointDto, IDebugSessionDto
 } from 'vs/workbench/api/common/extHost.protocol';
 import * as vscode from 'vscode';
-import { Disposable, Position, Location, SourceBreakpoint, FunctionBreakpoint, DebugAdapterServer, DebugAdapterExecutable } from 'vs/workbench/api/common/extHostTypes';
+import { Disposable, Position, Location, SourceBreakpoint, FunctionBreakpoint, DebugAdapterServer, DebugAdapterExecutable, DataBreakpoint } from 'vs/workbench/api/common/extHostTypes';
 import { ExecutableDebugAdapter, SocketDebugAdapter } from 'vs/workbench/contrib/debug/node/debugAdapter';
 import { AbstractDebugAdapter } from 'vs/workbench/contrib/debug/common/abstractDebugAdapter';
 import { IExtHostWorkspace } from 'vs/workbench/api/common/extHostWorkspace';
@@ -41,7 +41,7 @@ import { IExtHostDebugService } from 'vs/workbench/api/common/extHostDebugServic
 
 export class ExtHostDebugService implements IExtHostDebugService, ExtHostDebugServiceShape {
 
-	readonly _serviceBrand: any;
+	readonly _serviceBrand: undefined;
 
 	private _configProviderHandleCounter: number;
 	private _configProviders: ConfigProviderTuple[];
@@ -248,7 +248,8 @@ export class ExtHostDebugService implements IExtHostDebugService, ExtHostDebugSe
 		// unregister with VS Code
 		const ids = breakpoints.filter(bp => bp instanceof SourceBreakpoint).map(bp => bp.id);
 		const fids = breakpoints.filter(bp => bp instanceof FunctionBreakpoint).map(bp => bp.id);
-		return this._debugServiceProxy.$unregisterBreakpoints(ids, fids);
+		const dids = breakpoints.filter(bp => bp instanceof DataBreakpoint).map(bp => bp.id);
+		return this._debugServiceProxy.$unregisterBreakpoints(ids, fids, dids);
 	}
 
 	public startDebugging(folder: vscode.WorkspaceFolder | undefined, nameOrConfig: string | vscode.DebugConfiguration, parentSession?: vscode.DebugSession): Promise<boolean> {
@@ -554,6 +555,8 @@ export class ExtHostDebugService implements IExtHostDebugService, ExtHostDebugSe
 					let bp: vscode.Breakpoint;
 					if (bpd.type === 'function') {
 						bp = new FunctionBreakpoint(bpd.functionName, bpd.enabled, bpd.condition, bpd.hitCondition, bpd.logMessage);
+					} else if (bpd.type === 'data') {
+						bp = new DataBreakpoint(bpd.label, bpd.dataId, bpd.canPersist, bpd.enabled, bpd.hitCondition, bpd.condition, bpd.logMessage);
 					} else {
 						const uri = URI.revive(bpd.uri);
 						bp = new SourceBreakpoint(new Location(uri, new Position(bpd.line, bpd.character)), bpd.enabled, bpd.condition, bpd.hitCondition, bpd.logMessage);
@@ -682,6 +685,13 @@ export class ExtHostDebugService implements IExtHostDebugService, ExtHostDebugSe
 	public async $acceptDebugSessionActiveChanged(sessionDto: IDebugSessionDto | undefined): Promise<void> {
 		this._activeDebugSession = sessionDto ? await this.getSession(sessionDto) : undefined;
 		this._onDidChangeActiveDebugSession.fire(this._activeDebugSession);
+	}
+
+	public async $acceptDebugSessionNameChanged(sessionDto: IDebugSessionDto, name: string): Promise<void> {
+		const session = await this.getSession(sessionDto);
+		if (session) {
+			session._acceptNameChanged(name);
+		}
 	}
 
 	public async $acceptDebugSessionCustomEvent(sessionDto: IDebugSessionDto, event: any): Promise<void> {
@@ -912,6 +922,15 @@ export class ExtHostDebugSession implements vscode.DebugSession {
 
 	public get name(): string {
 		return this._name;
+	}
+
+	public set name(name: string) {
+		this._name = name;
+		this._debugServiceProxy.$setDebugSessionName(this._id, name);
+	}
+
+	_acceptNameChanged(name: string) {
+		this._name = name;
 	}
 
 	public get workspaceFolder(): vscode.WorkspaceFolder | undefined {

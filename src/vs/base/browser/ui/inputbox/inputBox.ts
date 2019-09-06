@@ -32,6 +32,7 @@ export interface IInputOptions extends IInputBoxStyles {
 	readonly type?: string;
 	readonly validationOptions?: IInputValidationOptions;
 	readonly flexibleHeight?: boolean;
+	readonly flexibleWidth?: boolean;
 	readonly flexibleMaxHeight?: number;
 	readonly actions?: ReadonlyArray<IAction>;
 }
@@ -158,7 +159,7 @@ export class InputBox extends Widget {
 		let tagName = this.options.flexibleHeight ? 'textarea' : 'input';
 
 		let wrapper = dom.append(this.element, $('.wrapper'));
-		this.input = dom.append(wrapper, $(tagName + '.input'));
+		this.input = dom.append(wrapper, $(tagName + '.input.empty'));
 		this.input.setAttribute('autocorrect', 'off');
 		this.input.setAttribute('autocapitalize', 'off');
 		this.input.setAttribute('spellcheck', 'false');
@@ -173,6 +174,13 @@ export class InputBox extends Widget {
 			this.mirror.innerHTML = '&nbsp;';
 
 			this.scrollableElement = new ScrollableElement(this.element, { vertical: ScrollbarVisibility.Auto });
+
+			if (this.options.flexibleWidth) {
+				this.input.setAttribute('wrap', 'off');
+				this.mirror.style.whiteSpace = 'pre';
+				this.mirror.style.wordWrap = 'initial';
+			}
+
 			dom.append(container, this.scrollableElement.getDomNode());
 			this._register(this.scrollableElement);
 
@@ -212,13 +220,7 @@ export class InputBox extends Widget {
 			});
 		}
 
-		setTimeout(() => {
-			if (!this.input) {
-				return;
-			}
-
-			this.updateMirror();
-		}, 0);
+		setTimeout(() => this.updateMirror(), 0);
 
 		// Support actions
 		if (this.options.actions) {
@@ -238,21 +240,18 @@ export class InputBox extends Widget {
 	}
 
 	public setPlaceHolder(placeHolder: string): void {
-		if (this.input) {
-			this.input.setAttribute('placeholder', placeHolder);
-			this.input.title = placeHolder;
-		}
+		this.placeholder = placeHolder;
+		this.input.setAttribute('placeholder', placeHolder);
+		this.input.title = placeHolder;
 	}
 
 	public setAriaLabel(label: string): void {
 		this.ariaLabel = label;
 
-		if (this.input) {
-			if (label) {
-				this.input.setAttribute('aria-label', this.ariaLabel);
-			} else {
-				this.input.removeAttribute('aria-label');
-			}
+		if (label) {
+			this.input.setAttribute('aria-label', this.ariaLabel);
+		} else {
+			this.input.removeAttribute('aria-label');
 		}
 	}
 
@@ -321,9 +320,33 @@ export class InputBox extends Widget {
 	}
 
 	public set width(width: number) {
-		this.input.style.width = width + 'px';
+		if (this.options.flexibleHeight && this.options.flexibleWidth) {
+			// textarea with horizontal scrolling
+			let horizontalPadding = 0;
+			if (this.mirror) {
+				const paddingLeft = parseFloat(this.mirror.style.paddingLeft || '') || 0;
+				const paddingRight = parseFloat(this.mirror.style.paddingRight || '') || 0;
+				horizontalPadding = paddingLeft + paddingRight;
+			}
+			this.input.style.width = (width - horizontalPadding) + 'px';
+		} else {
+			this.input.style.width = width + 'px';
+		}
+
 		if (this.mirror) {
 			this.mirror.style.width = width + 'px';
+		}
+	}
+
+	public set paddingRight(paddingRight: number) {
+		if (this.options.flexibleHeight && this.options.flexibleWidth) {
+			this.input.style.width = `calc(100% - ${paddingRight}px)`;
+		} else {
+			this.input.style.paddingRight = paddingRight + 'px';
+		}
+
+		if (this.mirror) {
+			this.mirror.style.paddingRight = paddingRight + 'px';
 		}
 	}
 
@@ -484,6 +507,7 @@ export class InputBox extends Widget {
 
 		this.validate();
 		this.updateMirror();
+		dom.toggleClass(this.input, 'empty', !this.value);
 
 		if (this.state === 'open' && this.contextViewProvider) {
 			this.contextViewProvider.layout();
@@ -495,7 +519,7 @@ export class InputBox extends Widget {
 			return;
 		}
 
-		const value = this.value || this.placeholder;
+		const value = this.value;
 		const lastCharCode = value.charCodeAt(value.length - 1);
 		const suffix = lastCharCode === 10 ? ' ' : '';
 		const mirrorTextContent = value + suffix;
@@ -528,20 +552,18 @@ export class InputBox extends Widget {
 	}
 
 	protected applyStyles(): void {
-		if (this.element) {
-			const background = this.inputBackground ? this.inputBackground.toString() : null;
-			const foreground = this.inputForeground ? this.inputForeground.toString() : null;
-			const border = this.inputBorder ? this.inputBorder.toString() : null;
+		const background = this.inputBackground ? this.inputBackground.toString() : null;
+		const foreground = this.inputForeground ? this.inputForeground.toString() : null;
+		const border = this.inputBorder ? this.inputBorder.toString() : null;
 
-			this.element.style.backgroundColor = background;
-			this.element.style.color = foreground;
-			this.input.style.backgroundColor = background;
-			this.input.style.color = foreground;
+		this.element.style.backgroundColor = background;
+		this.element.style.color = foreground;
+		this.input.style.backgroundColor = background;
+		this.input.style.color = foreground;
 
-			this.element.style.borderWidth = border ? '1px' : null;
-			this.element.style.borderStyle = border ? 'solid' : null;
-			this.element.style.borderColor = border;
-		}
+		this.element.style.borderWidth = border ? '1px' : null;
+		this.element.style.borderStyle = border ? 'solid' : null;
+		this.element.style.borderColor = border;
 	}
 
 	public layout(): void {
@@ -562,13 +584,11 @@ export class InputBox extends Widget {
 	public dispose(): void {
 		this._hideMessage();
 
-		this.element = null!; // StrictNullOverride: nulling out ok in dispose
-		this.input = null!; // StrictNullOverride: nulling out ok in dispose
-		this.contextViewProvider = undefined;
 		this.message = null;
-		this.validation = undefined;
-		this.state = null!; // StrictNullOverride: nulling out ok in dispose
-		this.actionbar = undefined;
+
+		if (this.actionbar) {
+			this.actionbar.dispose();
+		}
 
 		super.dispose();
 	}

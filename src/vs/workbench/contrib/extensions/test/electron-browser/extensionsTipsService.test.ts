@@ -15,14 +15,14 @@ import {
 	DidInstallExtensionEvent, DidUninstallExtensionEvent, InstallExtensionEvent, IExtensionIdentifier
 } from 'vs/platform/extensionManagement/common/extensionManagement';
 import { IExtensionEnablementService } from 'vs/workbench/services/extensionManagement/common/extensionManagement';
-import { ExtensionTipsService } from 'vs/workbench/contrib/extensions/electron-browser/extensionTipsService';
+import { ExtensionTipsService } from 'vs/workbench/contrib/extensions/browser/extensionTipsService';
 import { ExtensionGalleryService } from 'vs/platform/extensionManagement/common/extensionGalleryService';
 import { TestInstantiationService } from 'vs/platform/instantiation/test/common/instantiationServiceMock';
 import { Emitter } from 'vs/base/common/event';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import { IWorkspaceContextService } from 'vs/platform/workspace/common/workspace';
-import { TestContextService, TestLifecycleService, TestSharedProcessService } from 'vs/workbench/test/workbenchTestServices';
+import { TestContextService, TestLifecycleService, TestSharedProcessService, productService } from 'vs/workbench/test/workbenchTestServices';
 import { TestNotificationService } from 'vs/platform/notification/test/common/testNotificationService';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { URI } from 'vs/base/common/uri';
@@ -36,12 +36,11 @@ import { ConfigurationKey } from 'vs/workbench/contrib/extensions/common/extensi
 import { ExtensionManagementService } from 'vs/platform/extensionManagement/node/extensionManagementService';
 import { TestExtensionEnablementService } from 'vs/workbench/services/extensionManagement/test/electron-browser/extensionEnablementService.test';
 import { IURLService } from 'vs/platform/url/common/url';
-import product from 'vs/platform/product/node/product';
 import { ITextModel } from 'vs/editor/common/model';
 import { IModelService } from 'vs/editor/common/services/modelService';
 import { ILifecycleService } from 'vs/platform/lifecycle/common/lifecycle';
 import { INotificationService, Severity, IPromptChoice, IPromptOptions } from 'vs/platform/notification/common/notification';
-import { URLService } from 'vs/platform/url/common/urlService';
+import { URLService } from 'vs/platform/url/node/urlService';
 import { IExperimentService } from 'vs/workbench/contrib/experiments/common/experimentService';
 import { TestExperimentService } from 'vs/workbench/contrib/experiments/test/electron-browser/experimentService.test';
 import { IStorageService, StorageScope } from 'vs/platform/storage/common/storage';
@@ -66,17 +65,17 @@ const mockExtensionGallery: IGalleryExtension[] = [
 		rating: 4,
 		ratingCount: 100
 	}, {
-			dependencies: ['pub.1'],
-		}, {
-			manifest: { uri: 'uri:manifest', fallbackUri: 'fallback:manifest' },
-			readme: { uri: 'uri:readme', fallbackUri: 'fallback:readme' },
-			changelog: { uri: 'uri:changelog', fallbackUri: 'fallback:changlog' },
-			download: { uri: 'uri:download', fallbackUri: 'fallback:download' },
-			icon: { uri: 'uri:icon', fallbackUri: 'fallback:icon' },
-			license: { uri: 'uri:license', fallbackUri: 'fallback:license' },
-			repository: { uri: 'uri:repository', fallbackUri: 'fallback:repository' },
-			coreTranslations: []
-		}),
+		dependencies: ['pub.1'],
+	}, {
+		manifest: { uri: 'uri:manifest', fallbackUri: 'fallback:manifest' },
+		readme: { uri: 'uri:readme', fallbackUri: 'fallback:readme' },
+		changelog: { uri: 'uri:changelog', fallbackUri: 'fallback:changlog' },
+		download: { uri: 'uri:download', fallbackUri: 'fallback:download' },
+		icon: { uri: 'uri:icon', fallbackUri: 'fallback:icon' },
+		license: { uri: 'uri:license', fallbackUri: 'fallback:license' },
+		repository: { uri: 'uri:repository', fallbackUri: 'fallback:repository' },
+		coreTranslations: []
+	}),
 	aGalleryExtension('MockExtension2', {
 		displayName: 'Mock Extension 2',
 		version: '1.5',
@@ -88,17 +87,17 @@ const mockExtensionGallery: IGalleryExtension[] = [
 		rating: 4,
 		ratingCount: 100
 	}, {
-			dependencies: ['pub.1', 'pub.2'],
-		}, {
-			manifest: { uri: 'uri:manifest', fallbackUri: 'fallback:manifest' },
-			readme: { uri: 'uri:readme', fallbackUri: 'fallback:readme' },
-			changelog: { uri: 'uri:changelog', fallbackUri: 'fallback:changlog' },
-			download: { uri: 'uri:download', fallbackUri: 'fallback:download' },
-			icon: { uri: 'uri:icon', fallbackUri: 'fallback:icon' },
-			license: { uri: 'uri:license', fallbackUri: 'fallback:license' },
-			repository: { uri: 'uri:repository', fallbackUri: 'fallback:repository' },
-			coreTranslations: []
-		})
+		dependencies: ['pub.1', 'pub.2'],
+	}, {
+		manifest: { uri: 'uri:manifest', fallbackUri: 'fallback:manifest' },
+		readme: { uri: 'uri:readme', fallbackUri: 'fallback:readme' },
+		changelog: { uri: 'uri:changelog', fallbackUri: 'fallback:changlog' },
+		download: { uri: 'uri:download', fallbackUri: 'fallback:download' },
+		icon: { uri: 'uri:icon', fallbackUri: 'fallback:icon' },
+		license: { uri: 'uri:license', fallbackUri: 'fallback:license' },
+		repository: { uri: 'uri:repository', fallbackUri: 'fallback:repository' },
+		coreTranslations: []
+	})
 ];
 
 const mockExtensionLocal = [
@@ -202,23 +201,22 @@ suite('ExtensionsTipsService Test', () => {
 		instantiationService.stub(IExtensionEnablementService, new TestExtensionEnablementService(instantiationService));
 		instantiationService.stub(ITelemetryService, NullTelemetryService);
 		instantiationService.stub(IURLService, URLService);
-		instantiationService.stub(IProductService, <Partial<IProductService>>{
-			productConfiguration: {
-				...product, ...{
-					extensionTips: {
-						'ms-vscode.csharp': '{**/*.cs,**/project.json,**/global.json,**/*.csproj,**/*.sln,**/appsettings.json}',
-						'msjsdiag.debugger-for-chrome': '{**/*.ts,**/*.tsx**/*.js,**/*.jsx,**/*.es6,**/.babelrc}',
-						'lukehoban.Go': '**/*.go'
+		instantiationService.set(IProductService, {
+			...productService,
+			...{
+				extensionTips: {
+					'ms-vscode.csharp': '{**/*.cs,**/project.json,**/global.json,**/*.csproj,**/*.sln,**/appsettings.json}',
+					'msjsdiag.debugger-for-chrome': '{**/*.ts,**/*.tsx**/*.js,**/*.jsx,**/*.es6,**/.babelrc}',
+					'lukehoban.Go': '**/*.go'
+				},
+				extensionImportantTips: {
+					'ms-python.python': {
+						'name': 'Python',
+						'pattern': '{**/*.py}'
 					},
-					extensionImportantTips: {
-						'ms-python.python': {
-							'name': 'Python',
-							'pattern': '{**/*.py}'
-						},
-						'ms-vscode.PowerShell': {
-							'name': 'PowerShell',
-							'pattern': '{**/*.ps,**/*.ps1}'
-						}
+					'ms-vscode.PowerShell': {
+						'name': 'PowerShell',
+						'pattern': '{**/*.ps,**/*.ps1}'
 					}
 				}
 			}
@@ -237,7 +235,7 @@ suite('ExtensionsTipsService Test', () => {
 	});
 
 	setup(() => {
-		instantiationService.stub(IEnvironmentService, <Partial<IEnvironmentService>>{ extensionDevelopmentPath: false });
+		instantiationService.stub(IEnvironmentService, <Partial<IEnvironmentService>>{});
 		instantiationService.stubPromise(IExtensionManagementService, 'getInstalled', []);
 		instantiationService.stub(IExtensionGalleryService, 'isEnabled', true);
 		instantiationService.stubPromise(IExtensionGalleryService, 'query', aPage<IGalleryExtension>(...mockExtensionGallery));

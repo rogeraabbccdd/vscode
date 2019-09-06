@@ -16,17 +16,6 @@
 
 declare module 'vscode' {
 
-	//#region Joh - ExecutionContext
-	// THIS is a deprecated proposal
-	export enum ExtensionExecutionContext {
-		Local = 1,
-		Remote = 2
-	}
-	export interface ExtensionContext {
-		executionContext: ExtensionExecutionContext;
-	}
-	//#endregion
-
 	//#region Joh - call hierarchy
 
 	export enum CallHierarchyDirection {
@@ -565,43 +554,19 @@ declare module 'vscode' {
 
 	//#endregion
 
-	//#region Joh: onDidExecuteCommand
-
-	export interface CommandExecutionEvent {
-		command: string;
-		arguments: any[];
-	}
-
-	export namespace commands {
-		/**
-		 * An event that is emitted when a [command](#Command) is executed.
-		 */
-		export const onDidExecuteCommand: Event<CommandExecutionEvent>;
-	}
-
-	//#endregion
-
 	//#region Joh: decorations
 
-	//todo@joh -> make class
-	export interface DecorationData {
+	export class Decoration {
 		letter?: string;
 		title?: string;
 		color?: ThemeColor;
 		priority?: number;
 		bubble?: boolean;
-		source?: string; // hacky... we should remove it and use equality under the hood
-	}
-
-	export interface SourceControlResourceDecorations {
-		source?: string;
-		letter?: string;
-		color?: ThemeColor;
 	}
 
 	export interface DecorationProvider {
 		onDidChangeDecorations: Event<undefined | Uri | Uri[]>;
-		provideDecoration(uri: Uri, token: CancellationToken): ProviderResult<DecorationData>;
+		provideDecoration(uri: Uri, token: CancellationToken): ProviderResult<Decoration>;
 	}
 
 	export namespace window {
@@ -795,179 +760,6 @@ declare module 'vscode' {
 		readonly onDidWriteData: Event<string>;
 	}
 
-	/**
-	 * Represents the dimensions of a terminal.
-	 */
-	export interface TerminalDimensions {
-		/**
-		 * The number of columns in the terminal.
-		 */
-		readonly columns: number;
-
-		/**
-		 * The number of rows in the terminal.
-		 */
-		readonly rows: number;
-	}
-
-	//#endregion
-
-	//#region Extension terminals
-
-	export namespace window {
-		/**
-		 * Creates a [Terminal](#Terminal) where an extension controls the terminal.
-		 *
-		 * @param options An [ExtensionTerminalOptions](#ExtensionTerminalOptions) object describing
-		 * the characteristics of the new terminal.
-		 * @return A new Terminal.
-		 */
-		export function createTerminal(options: ExtensionTerminalOptions): Terminal;
-	}
-
-	/**
-	 * Value-object describing what options a virtual process terminal should use.
-	 */
-	export interface ExtensionTerminalOptions {
-		/**
-		 * A human-readable string which will be used to represent the terminal in the UI.
-		 */
-		name: string;
-
-		/**
-		 * An implementation of [Pseudoterminal](#Pseudoterminal) that allows an extension to
-		 * control a terminal.
-		 */
-		pty: Pseudoterminal;
-	}
-
-	/**
-	 * Defines the interface of a terminal pty, enabling extensions to control a terminal.
-	 */
-	interface Pseudoterminal {
-		/**
-		 * An event that when fired will write data to the terminal. Unlike
-		 * [Terminal.sendText](#Terminal.sendText) which sends text to the underlying _process_
-		 * (the pty "slave"), this will write the text to the terminal itself (the pty "master").
-		 *
-		 * **Example:** Write red text to the terminal
-		 * ```typescript
-		 * const writeEmitter = new vscode.EventEmitter<string>();
-		 * const pty: vscode.Pseudoterminal = {
-		 *   onDidWrite: writeEmitter.event,
-		 *   open: () => writeEmitter.fire('\x1b[31mHello world\x1b[0m'),
-		 *   close: () => {}
-		 * };
-		 * vscode.window.createTerminal({ name: 'My terminal', pty });
-		 * ```
-		 *
-		 * **Example:** Move the cursor to the 10th row and 20th column and write an asterisk
-		 * ```typescript
-		 * writeEmitter.fire('\x1b[10;20H*');
-		 * ```
-		 */
-		onDidWrite: Event<string>;
-
-		/**
-		 * An event that when fired allows overriding the [dimensions](#Terminal.dimensions) of the
-		 * terminal. Note that when set, the overridden dimensions will only take effect when they
-		 * are lower than the actual dimensions of the terminal (ie. there will never be a scroll
-		 * bar). Set to `undefined` for the terminal to go back to the regular dimensions (fit to
-		 * the size of the panel).
-		 *
-		 * **Example:** Override the dimensions of a terminal to 20 columns and 10 rows
-		 * ```typescript
-		 * const dimensionsEmitter = new vscode.EventEmitter<vscode.TerminalDimensions>();
-		 * const pty: vscode.Pseudoterminal = {
-		 *   onDidWrite: writeEmitter.event,
-		 *   onDidOverrideDimensions: dimensionsEmitter.event,
-		 *   open: () => {
-		 *     dimensionsEmitter.fire({
-		 *       columns: 20,
-		 *       rows: 10
-		 *     });
-		 *   },
-		 *   close: () => {}
-		 * };
-		 * vscode.window.createTerminal({ name: 'My terminal', pty });
-		 * ```
-		 */
-		onDidOverrideDimensions?: Event<TerminalDimensions | undefined>;
-
-		/**
-		 * An event that when fired will signal that the pty is closed and dispose of the terminal.
-		 *
-		 * **Example:** Exit the terminal when "y" is pressed, otherwise show a notification.
-		 * ```typescript
-		 * const writeEmitter = new vscode.EventEmitter<string>();
-		 * const closeEmitter = new vscode.EventEmitter<vscode.TerminalDimensions>();
-		 * const pty: vscode.Pseudoterminal = {
-		 *   onDidWrite: writeEmitter.event,
-		 *   onDidClose: closeEmitter.event,
-		 *   open: () => writeEmitter.fire('Press y to exit successfully'),
-		 *   close: () => {}
-		 *   handleInput: data => {
-		 *     if (data !== 'y') {
-		 *       vscode.window.showInformationMessage('Something went wrong');
-		 *     }
-		 *     closeEmitter.fire();
-		 *   }
-		 * };
-		 * vscode.window.createTerminal({ name: 'Exit example', pty });
-		 */
-		onDidClose?: Event<void>;
-
-		/**
-		 * Implement to handle when the pty is open and ready to start firing events.
-		 *
-		 * @param initialDimensions The dimensions of the terminal, this will be undefined if the
-		 * terminal panel has not been opened before this is called.
-		 */
-		open(initialDimensions: TerminalDimensions | undefined): void;
-
-		/**
-		 * Implement to handle when the terminal is closed by an act of the user.
-		 */
-		close(): void;
-
-		/**
-		 * Implement to handle incoming keystrokes in the terminal or when an extension calls
-		 * [Terminal.sendText](#Terminal.sendText). `data` contains the keystrokes/text serialized into
-		 * their corresponding VT sequence representation.
-		 *
-		 * @param data The incoming data.
-		 *
-		 * **Example:** Echo input in the terminal. The sequence for enter (`\r`) is translated to
-		 * CRLF to go to a new line and move the cursor to the start of the line.
-		 * ```typescript
-		 * const writeEmitter = new vscode.EventEmitter<string>();
-		 * const pty: vscode.Pseudoterminal = {
-		 *   onDidWrite: writeEmitter.event,
-		 *   open: () => {},
-		 *   close: () => {},
-		 *   handleInput: data => writeEmitter.fire(data === '\r' ? '\r\n' : data)
-		 * };
-		 * vscode.window.createTerminal({ name: 'Local echo', pty });
-		 * ```
-		 */
-		handleInput?(data: string): void;
-
-		/**
-		 * Implement to handle when the number of rows and columns that fit into the terminal panel
-		 * changes, for example when font size changes or when the panel is resized. The initial
-		 * state of a terminal's dimensions should be treated as `undefined` until this is triggered
-		 * as the size of a terminal isn't know until it shows up in the user interface.
-		 *
-		 * When dimensions are overridden by
-		 * [onDidOverrideDimensions](#Pseudoterminal.onDidOverrideDimensions), `setDimensions` will
-		 * continue to be called with the regular panel dimensions, allowing the extension continue
-		 * to react dimension changes.
-		 *
-		 * @param dimensions The new dimensions.
-		 */
-		setDimensions?(dimensions: TerminalDimensions): void;
-	}
-
 	//#endregion
 
 	//#region Joh -> exclusive document filters
@@ -1149,34 +941,49 @@ declare module 'vscode' {
 
 	//#endregion
 
-	//#region Webview Resource Roots
+	// #region Ben - extension auth flow (desktop+web)
 
-	export interface Webview {
-		/**
-		 * Convert a uri for the local file system to one that can be used inside webviews.
-		 *
-		 * Webviews cannot directly load resoruces from the workspace or local file system using `file:` uris. The
-		 * `toWebviewResource` function takes a local `file:` uri and converts it into a uri that can be used inside of
-		 * a webview to load the same resource:
-		 *
-		 * ```ts
-		 * webview.html = `<img src="${webview.toWebviewResource(vscode.Uri.file('/Users/codey/workspace/cat.gif'))}">`
-		 * ```
-		 */
-		toWebviewResource(localResource: Uri): Uri;
+	export interface AppUriOptions {
+		payload?: {
+			path?: string;
+			query?: string;
+			fragment?: string;
+		};
+	}
+
+	export namespace env {
 
 		/**
-		 * Content security policy source for webview resources.
+		 * Creates a Uri that - if opened in a browser - will result in a
+		 * registered [UriHandler](#UriHandler) to fire. The handler's
+		 * Uri will be configured with the path, query and fragment of
+		 * [AppUriOptions](#AppUriOptions) if provided, otherwise it will be empty.
 		 *
-		 * This is origin used in a content security policy rule:
+		 * Extensions should not make any assumptions about the resulting
+		 * Uri and should not alter it in anyway. Rather, extensions can e.g.
+		 * use this Uri in an authentication flow, by adding the Uri as
+		 * callback query argument to the server to authenticate to.
 		 *
+		 * Note: If the server decides to add additional query parameters to the Uri
+		 * (e.g. a token or secret), it will appear in the Uri that is passed
+		 * to the [UriHandler](#UriHandler).
+		 *
+		 * **Example** of an authentication flow:
+		 * ```typescript
+		 * vscode.window.registerUriHandler({
+		 *   handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
+		 *     if (uri.path === '/did-authenticate') {
+		 *       console.log(uri.toString());
+		 *     }
+		 *   }
+		 * });
+		 *
+		 * const callableUri = await vscode.env.createAppUri({ payload: { path: '/did-authenticate' } });
+		 * await vscode.env.openExternal(callableUri);
 		 * ```
-		 * img-src https: ${webview.cspSource} ...;
-		 * ````
 		 */
-		readonly cspSource: string;
+		export function createAppUri(options?: AppUriOptions): Thenable<Uri>;
 	}
 
 	//#endregion
-
 }

@@ -21,7 +21,7 @@ import { EndOfLineSequence, ISingleEditOperation } from 'vs/editor/common/model'
 import { IModelChangedEvent } from 'vs/editor/common/model/mirrorTextModel';
 import * as modes from 'vs/editor/common/modes';
 import { CharacterPair, CommentRule, EnterAction } from 'vs/editor/common/modes/languageConfiguration';
-import { ICommandHandlerDescription, ICommandEvent } from 'vs/platform/commands/common/commands';
+import { ICommandHandlerDescription } from 'vs/platform/commands/common/commands';
 import { ConfigurationTarget, IConfigurationData, IConfigurationModel } from 'vs/platform/configuration/common/configuration';
 import { ConfigurationScope } from 'vs/platform/configuration/common/configurationRegistry';
 import { ExtensionIdentifier, IExtensionDescription } from 'vs/platform/extensions/common/extensions';
@@ -115,8 +115,6 @@ export interface MainThreadClipboardShape extends IDisposable {
 
 export interface MainThreadCommandsShape extends IDisposable {
 	$registerCommand(id: string): void;
-	$registerCommandListener(): void;
-	$unregisterCommandListener(): void;
 	$unregisterCommand(id: string): void;
 	$executeCommand<T>(id: string, args: any[]): Promise<T | undefined>;
 	$getCommands(): Promise<string[]>;
@@ -242,7 +240,7 @@ export interface MainThreadTextEditorsShape extends IDisposable {
 }
 
 export interface MainThreadTreeViewsShape extends IDisposable {
-	$registerTreeViewDataProvider(treeViewId: string, options: { showCollapseAll: boolean }): void;
+	$registerTreeViewDataProvider(treeViewId: string, options: { showCollapseAll: boolean, canSelectMany: boolean }): void;
 	$refresh(treeViewId: string, itemsToRefresh?: { [treeItemHandle: string]: ITreeItem }): Promise<void>;
 	$reveal(treeViewId: string, treeItem: ITreeItem, parentChain: ITreeItem[], options: IRevealOptions): Promise<void>;
 	$setMessage(treeViewId: string, message: string): void;
@@ -265,6 +263,7 @@ export interface MainThreadKeytarShape extends IDisposable {
 	$setPassword(service: string, account: string, password: string): Promise<void>;
 	$deletePassword(service: string, account: string): Promise<boolean>;
 	$findPassword(service: string): Promise<string | null>;
+	$findCredentials(service: string): Promise<Array<{ account: string, password: string }>>;
 }
 
 export interface IRegExpDto {
@@ -551,15 +550,18 @@ export interface MainThreadWebviewsShape extends IDisposable {
 	$unregisterSerializer(viewType: string): void;
 }
 
-export interface WebviewPanelViewState {
-	readonly active: boolean;
-	readonly visible: boolean;
-	readonly position: EditorViewColumn;
+export interface WebviewPanelViewStateData {
+	[handle: string]: {
+		readonly active: boolean;
+		readonly visible: boolean;
+		readonly position: EditorViewColumn;
+	};
 }
 
 export interface ExtHostWebviewsShape {
 	$onMessage(handle: WebviewPanelHandle, message: any): void;
-	$onDidChangeWebviewPanelViewState(handle: WebviewPanelHandle, newState: WebviewPanelViewState): void;
+	$onMissingCsp(handle: WebviewPanelHandle, extensionId: string): void;
+	$onDidChangeWebviewPanelViewStates(newState: WebviewPanelViewStateData): void;
 	$onDidDisposeWebviewPanel(handle: WebviewPanelHandle): Promise<void>;
 	$deserializeWebviewPanel(newWebviewHandle: WebviewPanelHandle, viewType: string, title: string, state: any, position: EditorViewColumn, options: modes.IWebviewOptions & modes.IWebviewPanelOptions): Promise<void>;
 }
@@ -567,6 +569,7 @@ export interface ExtHostWebviewsShape {
 export interface MainThreadUrlsShape extends IDisposable {
 	$registerUriHandler(handle: number, extensionId: ExtensionIdentifier): Promise<void>;
 	$unregisterUriHandler(handle: number): Promise<void>;
+	$createAppUri(extensionId: ExtensionIdentifier, options?: { payload?: Partial<UriComponents> }): Promise<UriComponents>;
 }
 
 export interface ExtHostUrlsShape {
@@ -658,11 +661,7 @@ export type SCMRawResource = [
 	string[] /*icons: light, dark*/,
 	string /*tooltip*/,
 	boolean /*strike through*/,
-	boolean /*faded*/,
-
-	string | undefined /*source*/,
-	string | undefined /*letter*/,
-	ThemeColor | null /*color*/
+	boolean /*faded*/
 ];
 
 export type SCMRawResourceSplice = [
@@ -714,11 +713,12 @@ export interface MainThreadDebugServiceShape extends IDisposable {
 	$unregisterDebugConfigurationProvider(handle: number): void;
 	$unregisterDebugAdapterDescriptorFactory(handle: number): void;
 	$startDebugging(folder: UriComponents | undefined, nameOrConfig: string | IDebugConfiguration, parentSessionID: string | undefined): Promise<boolean>;
+	$setDebugSessionName(id: DebugSessionUUID, name: string): void;
 	$customDebugAdapterRequest(id: DebugSessionUUID, command: string, args: any): Promise<any>;
 	$appendDebugConsole(value: string): void;
 	$startBreakpointEvents(): void;
-	$registerBreakpoints(breakpoints: Array<ISourceMultiBreakpointDto | IFunctionBreakpointDto>): Promise<void>;
-	$unregisterBreakpoints(breakpointIds: string[], functionBreakpointIds: string[]): Promise<void>;
+	$registerBreakpoints(breakpoints: Array<ISourceMultiBreakpointDto | IFunctionBreakpointDto | IDataBreakpointDto>): Promise<void>;
+	$unregisterBreakpoints(breakpointIds: string[], functionBreakpointIds: string[], dataBreakpointIds: string[]): Promise<void>;
 }
 
 export interface IOpenUriOptions {
@@ -735,7 +735,6 @@ export interface MainThreadWindowShape extends IDisposable {
 export interface ExtHostCommandsShape {
 	$executeContributedCommand<T>(id: string, ...args: any[]): Promise<T>;
 	$getContributedCommandHandlerDescriptions(): Promise<{ [id: string]: string | ICommandHandlerDescription }>;
-	$handleDidExecuteCommand(command: ICommandEvent): void;
 }
 
 export interface ExtHostConfigurationShape {
@@ -744,7 +743,7 @@ export interface ExtHostConfigurationShape {
 }
 
 export interface ExtHostDiagnosticsShape {
-
+	$acceptMarkersChange(data: [UriComponents, IMarkerData[]][]): void;
 }
 
 export interface ExtHostDocumentContentProvidersShape {
@@ -935,6 +934,7 @@ export interface ISuggestDataDto {
 	k/* commitCharacters */?: string[];
 	l/* additionalTextEdits */?: ISingleEditOperation[];
 	m/* command */?: modes.Command;
+	n/* kindModifier */?: modes.CompletionItemTag[];
 	// not-standard
 	x?: ChainedCacheId;
 }
@@ -1185,6 +1185,7 @@ export interface ExtHostTaskShape {
 	$onDidEndTaskProcess(value: tasks.TaskProcessEndedDTO): void;
 	$OnDidEndTask(execution: tasks.TaskExecutionDTO): void;
 	$resolveVariables(workspaceFolder: UriComponents, toResolve: { process?: { name: string; cwd?: string }, variables: string[] }): Promise<{ process?: string; variables: { [key: string]: string } }>;
+	$getDefaultShellAndArgs(): Thenable<{ shell: string, args: string[] | string | undefined }>;
 }
 
 export interface IBreakpointDto {
@@ -1201,6 +1202,13 @@ export interface IFunctionBreakpointDto extends IBreakpointDto {
 	functionName: string;
 }
 
+export interface IDataBreakpointDto extends IBreakpointDto {
+	type: 'data';
+	dataId: string;
+	canPersist: boolean;
+	label: string;
+}
+
 export interface ISourceBreakpointDto extends IBreakpointDto {
 	type: 'source';
 	uri: UriComponents;
@@ -1209,9 +1217,9 @@ export interface ISourceBreakpointDto extends IBreakpointDto {
 }
 
 export interface IBreakpointsDeltaDto {
-	added?: Array<ISourceBreakpointDto | IFunctionBreakpointDto>;
+	added?: Array<ISourceBreakpointDto | IFunctionBreakpointDto | IDataBreakpointDto>;
 	removed?: string[];
-	changed?: Array<ISourceBreakpointDto | IFunctionBreakpointDto>;
+	changed?: Array<ISourceBreakpointDto | IFunctionBreakpointDto | IDataBreakpointDto>;
 }
 
 export interface ISourceMultiBreakpointDto {
@@ -1253,6 +1261,7 @@ export interface ExtHostDebugServiceShape {
 	$acceptDebugSessionActiveChanged(session: IDebugSessionDto | undefined): void;
 	$acceptDebugSessionCustomEvent(session: IDebugSessionDto, event: any): void;
 	$acceptBreakpointsDelta(delta: IBreakpointsDeltaDto): void;
+	$acceptDebugSessionNameChanged(session: IDebugSessionDto, name: string): void;
 }
 
 
@@ -1262,7 +1271,7 @@ export interface DecorationRequest {
 	readonly uri: UriComponents;
 }
 
-export type DecorationData = [number, boolean, string, string, ThemeColor, string];
+export type DecorationData = [number, boolean, string, string, ThemeColor];
 export type DecorationReply = { [id: number]: DecorationData };
 
 export interface ExtHostDecorationsShape {
@@ -1275,6 +1284,10 @@ export interface ExtHostWindowShape {
 
 export interface ExtHostLogServiceShape {
 	$setLevel(level: LogLevel): void;
+}
+
+export interface MainThreadLogShape {
+	$log(file: UriComponents, level: LogLevel, args: any[]): void;
 }
 
 export interface ExtHostOutputServiceShape {
@@ -1319,6 +1332,7 @@ export const MainContext = {
 	MainThreadKeytar: createMainId<MainThreadKeytarShape>('MainThreadKeytar'),
 	MainThreadLanguageFeatures: createMainId<MainThreadLanguageFeaturesShape>('MainThreadLanguageFeatures'),
 	MainThreadLanguages: createMainId<MainThreadLanguagesShape>('MainThreadLanguages'),
+	MainThreadLog: createMainId<MainThreadLogShape>('MainThread'),
 	MainThreadMessageService: createMainId<MainThreadMessageServiceShape>('MainThreadMessageService'),
 	MainThreadOutputService: createMainId<MainThreadOutputServiceShape>('MainThreadOutputService'),
 	MainThreadProgress: createMainId<MainThreadProgressShape>('MainThreadProgress'),

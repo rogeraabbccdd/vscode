@@ -173,7 +173,7 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 	private static readonly IgnoreTask010DonotShowAgain_key = 'workbench.tasks.ignoreTask010Shown';
 
 	private static CustomizationTelemetryEventName: string = 'taskService.customize';
-	public _serviceBrand: any;
+	public _serviceBrand: undefined;
 	public static OutputChannelId: string = 'tasks';
 	public static OutputChannelLabel: string = nls.localize('tasks', "Tasks");
 
@@ -1620,7 +1620,7 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 				nls.localize('TaskService.noWorkspace', "Tasks are only available on a workspace folder."),
 				[{
 					label: nls.localize('TaskService.learnMore', "Learn More"),
-					run: () => window.open('https://code.visualstudio.com/docs/editor/tasks')
+					run: () => this.openerService.open(URI.parse('https://code.visualstudio.com/docs/editor/tasks'))
 				}]
 			);
 			return false;
@@ -1723,18 +1723,18 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 			}
 			return entries;
 		}), {
-				placeHolder,
-				matchOnDescription: true,
-				onDidTriggerItemButton: context => {
-					let task = context.item.task;
-					this.quickInputService.cancel();
-					if (ContributedTask.is(task)) {
-						this.customize(task, undefined, true);
-					} else if (CustomTask.is(task)) {
-						this.openConfig(task);
-					}
+			placeHolder,
+			matchOnDescription: true,
+			onDidTriggerItemButton: context => {
+				let task = context.item.task;
+				this.quickInputService.cancel();
+				if (ContributedTask.is(task)) {
+					this.customize(task, undefined, true);
+				} else if (CustomTask.is(task)) {
+					this.openConfig(task);
 				}
-			});
+			}
+		});
 	}
 
 	private showIgnoredFoldersMessage(): Promise<void> {
@@ -2152,7 +2152,7 @@ export abstract class AbstractTaskService extends Disposable implements ITaskSer
 			return taskPromise.then((taskMap) => {
 				type EntryType = (IQuickPickItem & { task: Task; }) | (IQuickPickItem & { folder: IWorkspaceFolder; });
 				let entries: QuickPickInput<EntryType>[] = [];
-				if (this.contextService.getWorkbenchState() === WorkbenchState.FOLDER) {
+				if (this.contextService.getWorkbenchState() !== WorkbenchState.EMPTY) {
 					let tasks = taskMap.all();
 					let needsCreateOrOpen: boolean = true;
 					if (tasks.length > 0) {

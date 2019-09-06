@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import BaseSeverity from 'vs/base/common/severity';
-import { createDecorator, ServiceIdentifier } from 'vs/platform/instantiation/common/instantiation';
+import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { IAction } from 'vs/base/common/actions';
 import { Event, Emitter } from 'vs/base/common/event';
 import { IDisposable } from 'vs/base/common/lifecycle';
@@ -37,6 +37,19 @@ export interface INotificationProperties {
 	neverShowAgain?: INeverShowAgainOptions;
 }
 
+export enum NeverShowAgainScope {
+
+	/**
+	 * Will never show this notification on the current workspace again.
+	 */
+	WORKSPACE,
+
+	/**
+	 * Will never show this notification on any workspace again.
+	 */
+	GLOBAL
+}
+
 export interface INeverShowAgainOptions {
 
 	/**
@@ -49,6 +62,12 @@ export interface INeverShowAgainOptions {
 	 * make it a secondary action instead.
 	 */
 	isSecondary?: boolean;
+
+	/**
+	 * Wether to persist the choice in the current workspace or for all workspaces. By
+	 * default it will be persisted for all workspaces.
+	 */
+	scope?: NeverShowAgainScope;
 }
 
 export interface INotification extends INotificationProperties {
@@ -215,7 +234,7 @@ export interface IStatusMessageOptions {
  */
 export interface INotificationService {
 
-	_serviceBrand: ServiceIdentifier<INotificationService>;
+	_serviceBrand: undefined;
 
 	/**
 	 * Show the provided notification to the user. The returned `INotificationHandle`

@@ -357,7 +357,7 @@ interface HandlerData {
 
 export class ExtHostTask implements ExtHostTaskShape {
 
-	readonly _serviceBrand: any;
+	readonly _serviceBrand: undefined;
 
 	private readonly _proxy: MainThreadTaskShape;
 	private readonly _workspaceProvider: IExtHostWorkspaceProvider;
@@ -444,6 +444,14 @@ export class ExtHostTask implements ExtHostTaskShape {
 			if (dto === undefined) {
 				return Promise.reject(new Error('Task is not valid'));
 			}
+
+			// If this task is a custom execution, then we need to save it away
+			// in the provided custom execution map that is cleaned up after the
+			// task is executed.
+			if (CustomExecution2DTO.is(dto.execution)) {
+				await this.addCustomExecution2(dto, <vscode.Task2>task);
+			}
+
 			return this._proxy.$executeTask(dto).then(value => this.getTaskExecution(value, task));
 		}
 	}
@@ -528,11 +536,6 @@ export class ExtHostTask implements ExtHostTaskShape {
 		if (!handler) {
 			return Promise.reject(new Error('no handler found'));
 		}
-
-		// For custom execution tasks, we need to store the execution objects locally
-		// since we obviously cannot send callback functions through the proxy.
-		// So, clear out any existing ones.
-		this._providedCustomExecutions2.clear();
 
 		// Set up a list of task ID promises that we can wait on
 		// before returning the provided tasks. The ensures that
@@ -656,6 +659,10 @@ export class ExtHostTask implements ExtHostTaskShape {
 		return result;
 	}
 
+	public $getDefaultShellAndArgs(): Promise<{ shell: string, args: string[] | string | undefined }> {
+		return this._terminalService.$requestDefaultShellAndArgs(true);
+	}
+
 	private nextHandle(): number {
 		return this._handleCounter++;
 	}
@@ -691,6 +698,18 @@ export class ExtHostTask implements ExtHostTaskShape {
 		const extensionCallback2: vscode.CustomExecution2 | undefined = this._activeCustomExecutions2.get(execution.id);
 		if (extensionCallback2) {
 			this._activeCustomExecutions2.delete(execution.id);
+		}
+
+		const lastCustomExecution = this._providedCustomExecutions2.get(execution.id);
+		// Technically we don't really need to do this, however, if an extension
+		// is executing a task through "executeTask" over and over again
+		// with different properties in the task definition, then this list
+		// could grow indefinitely, something we don't want.
+		this._providedCustomExecutions2.clear();
+		// We do still need to hang on to the last custom execution so that the
+		// Rerun Task command doesn't choke when it tries to rerun a custom execution
+		if (lastCustomExecution) {
+			this._providedCustomExecutions2.set(execution.id, lastCustomExecution);
 		}
 	}
 }

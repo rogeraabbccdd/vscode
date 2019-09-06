@@ -33,7 +33,7 @@ import { ISelection, Selection } from 'vs/editor/common/core/selection';
 import { InternalEditorAction } from 'vs/editor/common/editorAction';
 import * as editorCommon from 'vs/editor/common/editorCommon';
 import { EditorContextKeys } from 'vs/editor/common/editorContextKeys';
-import { EndOfLinePreference, IIdentifiedSingleEditOperation, IModelDecoration, IModelDecorationOptions, IModelDecorationsChangeAccessor, IModelDeltaDecoration, ITextModel } from 'vs/editor/common/model';
+import { EndOfLinePreference, IIdentifiedSingleEditOperation, IModelDecoration, IModelDecorationOptions, IModelDecorationsChangeAccessor, IModelDeltaDecoration, ITextModel, ICursorStateComputer } from 'vs/editor/common/model';
 import { ClassName } from 'vs/editor/common/model/intervalTree';
 import { ModelDecorationOptions } from 'vs/editor/common/model/textModel';
 import { IModelContentChangedEvent, IModelDecorationsChangedEvent, IModelLanguageChangedEvent, IModelLanguageConfigurationChangedEvent, IModelOptionsChangedEvent } from 'vs/editor/common/model/textModelEvents';
@@ -526,7 +526,7 @@ export class CodeEditorWidget extends Disposable implements editorBrowser.ICodeE
 		const validatedModelRange = this._modelData.model.validateRange(modelRange);
 		const viewRange = this._modelData.viewModel.coordinatesConverter.convertModelRangeToViewRange(validatedModelRange);
 
-		this._modelData.cursor.emitCursorRevealRange(viewRange, verticalType, revealHorizontal, scrollType);
+		this._modelData.cursor.emitCursorRevealRange('api', viewRange, verticalType, revealHorizontal, scrollType);
 	}
 
 	public revealLine(lineNumber: number, scrollType: editorCommon.ScrollType = editorCommon.ScrollType.Smooth): void {
@@ -980,7 +980,7 @@ export class CodeEditorWidget extends Disposable implements editorBrowser.ICodeE
 		return true;
 	}
 
-	public executeEdits(source: string, edits: IIdentifiedSingleEditOperation[], endCursorState?: Selection[]): boolean {
+	public executeEdits(source: string, edits: IIdentifiedSingleEditOperation[], endCursorState?: ICursorStateComputer | Selection[]): boolean {
 		if (!this._modelData) {
 			return false;
 		}
@@ -989,14 +989,16 @@ export class CodeEditorWidget extends Disposable implements editorBrowser.ICodeE
 			return false;
 		}
 
-		this._modelData.model.pushEditOperations(this._modelData.cursor.getSelections(), edits, () => {
-			return endCursorState ? endCursorState : null;
-		});
-
-		if (endCursorState) {
-			this._modelData.cursor.setSelections(source, endCursorState);
+		let cursorStateComputer: ICursorStateComputer;
+		if (!endCursorState) {
+			cursorStateComputer = () => null;
+		} else if (Array.isArray(endCursorState)) {
+			cursorStateComputer = () => endCursorState;
+		} else {
+			cursorStateComputer = endCursorState;
 		}
 
+		this._modelData.cursor.executeEdits(source, edits, cursorStateComputer);
 		return true;
 	}
 

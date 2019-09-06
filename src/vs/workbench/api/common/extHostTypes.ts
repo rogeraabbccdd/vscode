@@ -979,6 +979,10 @@ export enum SymbolKind {
 	TypeParameter = 25
 }
 
+export enum SymbolTag {
+	Deprecated = 1,
+}
+
 @es5ClassCompat
 export class SymbolInformation {
 
@@ -991,6 +995,7 @@ export class SymbolInformation {
 	name: string;
 	location!: Location;
 	kind: SymbolKind;
+	tags?: SymbolTag[];
 	containerName: string | undefined;
 
 	constructor(name: string, kind: SymbolKind, containerName: string | undefined, location: Location);
@@ -1041,6 +1046,7 @@ export class DocumentSymbol {
 	name: string;
 	detail: string;
 	kind: SymbolKind;
+	tags?: SymbolTag[];
 	range: Range;
 	selectionRange: Range;
 	children: DocumentSymbol[];
@@ -1308,11 +1314,16 @@ export enum CompletionItemKind {
 	TypeParameter = 24
 }
 
+export enum CompletionItemTag {
+	Deprecated = 1,
+}
+
 @es5ClassCompat
 export class CompletionItem implements vscode.CompletionItem {
 
 	label: string;
 	kind?: CompletionItemKind;
+	tags?: CompletionItemTag[];
 	detail?: string;
 	documentation?: string | MarkdownString;
 	sortText?: string;
@@ -2167,6 +2178,24 @@ export class FunctionBreakpoint extends Breakpoint {
 }
 
 @es5ClassCompat
+export class DataBreakpoint extends Breakpoint {
+	readonly label: string;
+	readonly dataId: string;
+	readonly canPersist: boolean;
+
+	constructor(label: string, dataId: string, canPersist: boolean, enabled?: boolean, condition?: string, hitCondition?: string, logMessage?: string) {
+		super(enabled, condition, hitCondition, logMessage);
+		if (!dataId) {
+			throw illegalArgument('dataId');
+		}
+		this.label = label;
+		this.dataId = dataId;
+		this.canPersist = canPersist;
+	}
+}
+
+
+@es5ClassCompat
 export class DebugAdapterExecutable implements vscode.DebugAdapterExecutable {
 	readonly command: string;
 	readonly args: string[];
@@ -2316,12 +2345,25 @@ export class QuickInputButtons {
 	private constructor() { }
 }
 
-export enum ExtensionExecutionContext {
-	Local = 1,
-	Remote = 2
-}
-
 export enum ExtensionKind {
 	UI = 1,
 	Workspace = 2
+}
+
+export class Decoration {
+
+	static validate(d: Decoration): void {
+		if (d.letter && d.letter.length !== 1) {
+			throw new Error(`The 'letter'-property must be undefined or a single character`);
+		}
+		if (!d.bubble && !d.color && !d.letter && !d.priority && !d.title) {
+			throw new Error(`The decoration is empty`);
+		}
+	}
+
+	letter?: string;
+	title?: string;
+	color?: vscode.ThemeColor;
+	priority?: number;
+	bubble?: boolean;
 }

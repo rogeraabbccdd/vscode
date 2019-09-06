@@ -16,6 +16,8 @@ import { ParsedArgs } from 'vs/platform/environment/common/environment';
 import { IWindowsService } from 'vs/platform/windows/common/windows';
 import { URI } from 'vs/base/common/uri';
 import { IProcessEnvironment } from 'vs/base/common/platform';
+import { env as processEnv } from 'vs/base/common/process';
+import { IOpenerService } from 'vs/platform/opener/common/opener';
 
 /**
  * This interface represents a single command line argument split into a "prefix" and a "path" half.
@@ -73,7 +75,8 @@ export class RawDebugSession {
 		dbgr: IDebugger,
 		private readonly telemetryService: ITelemetryService,
 		public readonly customTelemetryService: ITelemetryService | undefined,
-		private readonly windowsService: IWindowsService
+		private readonly windowsService: IWindowsService,
+		private readonly openerService: IOpenerService
 
 	) {
 		this.debugAdapter = debugAdapter;
@@ -356,6 +359,20 @@ export class RawDebugSession {
 		return Promise.reject(new Error('setFunctionBreakpoints not supported'));
 	}
 
+	dataBreakpointInfo(args: DebugProtocol.DataBreakpointInfoArguments): Promise<DebugProtocol.DataBreakpointInfoResponse> {
+		if (this.capabilities.supportsDataBreakpoints) {
+			return this.send<DebugProtocol.DataBreakpointInfoResponse>('dataBreakpointInfo', args);
+		}
+		return Promise.reject(new Error('dataBreakpointInfo not supported'));
+	}
+
+	setDataBreakpoints(args: DebugProtocol.SetDataBreakpointsArguments): Promise<DebugProtocol.SetDataBreakpointsResponse> {
+		if (this.capabilities.supportsDataBreakpoints) {
+			return this.send<DebugProtocol.SetDataBreakpointsResponse>('setDataBreakpoints', args);
+		}
+		return Promise.reject(new Error('setDataBreakpoints not supported'));
+	}
+
 	setExceptionBreakpoints(args: DebugProtocol.SetExceptionBreakpointsArguments): Promise<DebugProtocol.SetExceptionBreakpointsResponse> {
 		return this.send<DebugProtocol.SetExceptionBreakpointsResponse>('setExceptionBreakpoints', args);
 	}
@@ -566,15 +583,17 @@ export class RawDebugSession {
 
 						const v = args[key];
 						if (v) {
-							if (Array.isArray(v)) {
-								v.push(value);
-							} else {
-								args[key] = [v, value];
-							}
+							v.push(value);
 						} else {
-							args[key] = value;
+							args[key] = [value];
 						}
-
+					} else if (key === 'extensionDevelopmentPath') {
+						const v = args[key];
+						if (v) {
+							v.push(value);
+						} else {
+							args[key] = [value];
+						}
 					} else {
 						(<any>args)[key] = value;
 					}
@@ -594,10 +613,7 @@ export class RawDebugSession {
 		let env: IProcessEnvironment = {};
 		if (vscodeArgs.env) {
 			// merge environment variables into a copy of the process.env
-			if (typeof process === 'object' && process.env) {
-				env = objects.mixin(env, process.env);
-			}
-			env = objects.mixin(env, vscodeArgs.env);
+			env = objects.mixin(processEnv, vscodeArgs.env);
 			// and delete some if necessary
 			Object.keys(env).filter(k => env[k] === null).forEach(key => delete env[key]);
 		}
@@ -640,7 +656,7 @@ export class RawDebugSession {
 			const label = error.urlLabel ? error.urlLabel : nls.localize('moreInfo', "More Info");
 			return createErrorWithActions(userMessage, {
 				actions: [new Action('debug.moreInfo', label, undefined, true, () => {
-					window.open(error.url);
+					this.openerService.open(URI.parse(error.url));
 					return Promise.resolve(null);
 				})]
 			});

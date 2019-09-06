@@ -30,7 +30,6 @@ import 'vs/workbench/electron-browser/desktop.main';
 import 'vs/workbench/services/integrity/node/integrityService';
 import 'vs/workbench/services/textMate/electron-browser/textMateService';
 import 'vs/workbench/services/workspace/electron-browser/workspaceEditingService';
-import 'vs/workbench/services/extensions/common/inactiveExtensionUrlHandler';
 import 'vs/workbench/services/search/node/searchService';
 import 'vs/workbench/services/output/node/outputChannelModelService';
 import 'vs/workbench/services/textfile/node/textFileService';
@@ -48,7 +47,8 @@ import 'vs/workbench/services/extensionManagement/node/extensionManagementServic
 import 'vs/workbench/services/accessibility/node/accessibilityService';
 import 'vs/workbench/services/remote/node/tunnelService';
 import 'vs/workbench/services/backup/node/backupFileService';
-import 'vs/workbench/services/opener/electron-browser/openerService';
+import 'vs/workbench/services/credentials/node/credentialsService';
+import 'vs/workbench/services/url/electron-browser/urlService';
 
 import { registerSingleton } from 'vs/platform/instantiation/common/extensions';
 import { IClipboardService } from 'vs/platform/clipboard/common/clipboardService';
@@ -60,36 +60,27 @@ import { ILifecycleService } from 'vs/platform/lifecycle/common/lifecycle';
 import { ILocalizationsService } from 'vs/platform/localizations/common/localizations';
 import { LocalizationsService } from 'vs/platform/localizations/electron-browser/localizationsService';
 import { ISharedProcessService, SharedProcessService } from 'vs/platform/ipc/electron-browser/sharedProcessService';
-import { IProductService } from 'vs/platform/product/common/product';
-import { ProductService } from 'vs/platform/product/node/productService';
 import { IWindowsService } from 'vs/platform/windows/common/windows';
 import { WindowsService } from 'vs/platform/windows/electron-browser/windowsService';
 import { IUpdateService } from 'vs/platform/update/common/update';
 import { UpdateService } from 'vs/platform/update/electron-browser/updateService';
-import { IIssueService } from 'vs/platform/issue/common/issue';
+import { IIssueService } from 'vs/platform/issue/node/issue';
 import { IssueService } from 'vs/platform/issue/electron-browser/issueService';
 import { IWorkspacesService } from 'vs/platform/workspaces/common/workspaces';
 import { WorkspacesService } from 'vs/platform/workspaces/electron-browser/workspacesService';
-import { IMenubarService } from 'vs/platform/menubar/common/menubar';
+import { IMenubarService } from 'vs/platform/menubar/node/menubar';
 import { MenubarService } from 'vs/platform/menubar/electron-browser/menubarService';
-import { IURLService } from 'vs/platform/url/common/url';
-import { RelayURLService } from 'vs/platform/url/electron-browser/urlService';
-import { ICredentialsService } from 'vs/platform/credentials/common/credentials';
-import { KeytarCredentialsService } from 'vs/platform/credentials/node/credentialsService';
 
 registerSingleton(IClipboardService, ClipboardService, true);
 registerSingleton(IRequestService, RequestService, true);
 registerSingleton(ILifecycleService, LifecycleService);
 registerSingleton(ILocalizationsService, LocalizationsService);
 registerSingleton(ISharedProcessService, SharedProcessService, true);
-registerSingleton(IProductService, ProductService, true);
 registerSingleton(IWindowsService, WindowsService);
 registerSingleton(IUpdateService, UpdateService);
 registerSingleton(IIssueService, IssueService);
 registerSingleton(IWorkspacesService, WorkspacesService);
 registerSingleton(IMenubarService, MenubarService);
-registerSingleton(IURLService, RelayURLService);
-registerSingleton(ICredentialsService, KeytarCredentialsService, true);
 
 //#endregion
 
@@ -98,9 +89,6 @@ registerSingleton(ICredentialsService, KeytarCredentialsService, true);
 
 // Localizations
 import 'vs/workbench/contrib/localizations/browser/localizations.contribution';
-
-// Logs
-import 'vs/workbench/contrib/logs/electron-browser/logs.contribution';
 
 // Stats
 import 'vs/workbench/contrib/stats/electron-browser/workspaceStatsService';
@@ -130,9 +118,6 @@ import 'vs/workbench/contrib/codeEditor/electron-browser/codeEditor.contribution
 
 // Execution
 import 'vs/workbench/contrib/externalTerminal/node/externalTerminalService';
-
-// Send a Smile
-import 'vs/workbench/contrib/feedback/browser/feedback.contribution';
 
 // Update
 import 'vs/workbench/contrib/update/electron-browser/update.contribution';

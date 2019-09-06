@@ -10,7 +10,7 @@ import { ContextKeyExpr, RawContextKey } from 'vs/platform/contextkey/common/con
 import { ITreeViewDataProvider } from 'vs/workbench/common/views';
 import { localize } from 'vs/nls';
 import { IViewlet } from 'vs/workbench/common/viewlet';
-import { createDecorator, ServiceIdentifier } from 'vs/platform/instantiation/common/instantiation';
+import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { IDisposable, Disposable } from 'vs/base/common/lifecycle';
 import { ThemeIcon } from 'vs/platform/theme/common/themeService';
 import { values, keys } from 'vs/base/common/map';
@@ -295,7 +295,7 @@ export interface IViewsViewlet extends IViewlet {
 export const IViewsService = createDecorator<IViewsService>('viewsService');
 
 export interface IViewsService {
-	_serviceBrand: ServiceIdentifier<any>;
+	_serviceBrand: undefined;
 
 	openView(id: string, focus?: boolean): Promise<IView | null>;
 
@@ -309,6 +309,8 @@ export interface ITreeView extends IDisposable {
 	dataProvider: ITreeViewDataProvider | undefined;
 
 	showCollapseAllAction: boolean;
+
+	canSelectMany: boolean;
 
 	message?: string;
 
@@ -331,8 +333,6 @@ export interface ITreeView extends IDisposable {
 	focus(): void;
 
 	layout(height: number, width: number): void;
-
-	show(container: HTMLElement): void;
 
 	getOptimalWidth(): number;
 
