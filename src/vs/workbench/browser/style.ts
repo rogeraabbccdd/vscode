@@ -50,7 +50,7 @@ registerThemingParticipant((theme: ITheme, collector: ICssStyleCollector) => {
 	}
 
 	// We need to set the workbench background color so that on Windows we get subpixel-antialiasing.
-	const workbenchBackground = theme.getColor(WORKBENCH_BACKGROUND);
+	const workbenchBackground = WORKBENCH_BACKGROUND(theme);
 	collector.addRule(`.monaco-workbench { background-color: ${workbenchBackground}; }`);
 
 	// Scrollbars

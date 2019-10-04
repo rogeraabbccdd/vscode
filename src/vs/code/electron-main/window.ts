@@ -125,7 +125,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			backgroundColor: this.themeMainService.getBackgroundColor(),
 			minWidth: CodeWindow.MIN_WIDTH,
 			minHeight: CodeWindow.MIN_HEIGHT,
-			show: false,
+			show: !isFullscreenOrMaximized,
 			title: product.nameLong,
 			webPreferences: {
 				// By default if Code is in the background, intervals and timeouts get throttled, so we

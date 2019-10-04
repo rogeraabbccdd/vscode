@@ -1237,7 +1237,7 @@ registerThemingParticipant((theme: ITheme, collector: ICssStyleCollector) => {
 
 	// Fade out styles via linear gradient (when tabs are set to shrink)
 	if (theme.type !== 'hc') {
-		const workbenchBackground = theme.getColor(WORKBENCH_BACKGROUND);
+		const workbenchBackground = WORKBENCH_BACKGROUND(theme);
 		const editorBackgroundColor = theme.getColor(editorBackground);
 		const editorGroupHeaderTabsBackground = theme.getColor(EDITOR_GROUP_HEADER_TABS_BACKGROUND);
 		const editorDragAndDropBackground = theme.getColor(EDITOR_DRAG_AND_DROP_BACKGROUND);
