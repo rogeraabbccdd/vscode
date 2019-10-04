@@ -16,7 +16,7 @@ import { IExtensionService } from 'vs/workbench/services/extensions/common/exten
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { URI } from 'vs/base/common/uri';
 import { isEqual } from 'vs/base/common/resources';
-import { isMacintosh, isNative } from 'vs/base/common/platform';
+import { isMacintosh, isNative, isLinux } from 'vs/base/common/platform';
 import { LifecyclePhase } from 'vs/platform/lifecycle/common/lifecycle';
 import { IDialogService } from 'vs/platform/dialogs/common/dialogs';
 import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/common/environmentService';
@@ -31,6 +31,7 @@ interface IConfiguration extends IWindowsConfiguration {
 
 export class SettingsChangeRelauncher extends Disposable implements IWorkbenchContribution {
 
+	private transparent: boolean | undefined;
 	private titleBarStyle: 'native' | 'custom' | undefined;
 	private nativeTabs: boolean | undefined;
 	private nativeFullScreen: boolean | undefined;
@@ -55,6 +56,12 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 
 	private onConfigurationChange(config: IConfiguration, notify: boolean): void {
 		let changed = false;
+
+		// Linux transparency
+		if (isLinux && config.window && typeof config.window.transparent === 'boolean' && config.window.transparent !== this.transparent) {
+			this.transparent = config.window.transparent;
+			changed = true;
+		}
 
 		// Tree horizontal scrolling support
 		if (config.workbench && config.workbench.list && typeof config.workbench.list.horizontalScrolling === 'boolean' && config.workbench.list.horizontalScrolling !== this.treeHorizontalScrolling) {
