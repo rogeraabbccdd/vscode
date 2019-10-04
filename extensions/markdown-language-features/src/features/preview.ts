@@ -284,15 +284,20 @@ export class MarkdownPreview extends Disposable {
 		super.dispose();
 	}
 
-	public update(resource: vscode.Uri) {
-		const editor = vscode.window.activeTextEditor;
+	public update(resource: vscode.Uri, isRefresh = true) {
 		// Reposition scroll preview, position scroll to the top if active text editor
 		// doesn't corresponds with preview
-		if (editor && editor.document.uri.fsPath === resource.fsPath) {
-			this.line = getVisibleLine(editor);
-		} else {
-			this.line = 0;
+		const editor = vscode.window.activeTextEditor;
+		if (editor) {
+			if (!isRefresh || this._previewConfigurations.loadAndCacheConfiguration(this._resource).scrollEditorWithPreview) {
+				if (editor.document.uri.fsPath === resource.fsPath) {
+					this.line = getVisibleLine(editor);
+				} else {
+					this.line = 0;
+				}
+			}
 		}
+
 
 		// If we have changed resources, cancel any pending updates
 		const isResourceChange = resource.fsPath !== this._resource.fsPath;
@@ -317,7 +322,7 @@ export class MarkdownPreview extends Disposable {
 
 	public refresh() {
 		this.forceUpdate = true;
-		this.update(this._resource);
+		this.update(this._resource, true);
 	}
 
 	public updateConfiguration() {
@@ -481,6 +486,12 @@ export class MarkdownPreview extends Disposable {
 
 	private onDidScrollPreview(line: number) {
 		this.line = line;
+
+		const config = this._previewConfigurations.loadAndCacheConfiguration(this._resource);
+		if (!config.scrollEditorWithPreview) {
+			return;
+		}
+
 		for (const editor of vscode.window.visibleTextEditors) {
 			if (!this.isPreviewOf(editor.document.uri)) {
 				continue;
@@ -540,7 +551,7 @@ export class MarkdownPreview extends Disposable {
 			}
 		}
 
-		vscode.commands.executeCommand('_markdown.openDocumentLink', { path, fragment });
+		vscode.commands.executeCommand('_markdown.openDocumentLink', { path, fragment, fromResource: this.resource });
 	}
 
 	private async onCacheImageSizes(imageInfo: { id: string, width: number, height: number }[]) {

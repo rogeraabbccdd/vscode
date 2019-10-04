@@ -400,7 +400,7 @@ export class Cursor extends viewEvents.ViewEventEmitter implements ICursors {
 			return this._columnSelectData;
 		}
 		const primaryCursor = this._cursors.getPrimaryCursor();
-		const primaryPos = primaryCursor.viewState.position;
+		const primaryPos = primaryCursor.viewState.selectionStart.getStartPosition();
 		const viewLineNumber = primaryPos.lineNumber;
 		const viewVisualColumn = CursorColumns.visibleColumnFromColumn2(this.context.config, this.context.viewModel, primaryPos);
 		return {
@@ -424,7 +424,7 @@ export class Cursor extends viewEvents.ViewEventEmitter implements ICursors {
 		return this._cursors.getPrimaryCursor().modelState.position;
 	}
 
-	public setSelections(source: string, selections: ISelection[]): void {
+	public setSelections(source: string, selections: readonly ISelection[]): void {
 		this.setStates(source, CursorChangeReason.NotSet, CursorState.fromModelSelections(selections));
 	}
 

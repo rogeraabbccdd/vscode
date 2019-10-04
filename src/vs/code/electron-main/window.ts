@@ -8,18 +8,19 @@ import * as objects from 'vs/base/common/objects';
 import * as os from 'os';
 import * as nls from 'vs/nls';
 import { URI } from 'vs/base/common/uri';
-import { screen, BrowserWindow, systemPreferences, app, TouchBar, nativeImage, Rectangle, Display } from 'electron';
+import { screen, BrowserWindow, systemPreferences, app, TouchBar, nativeImage, Rectangle, Display, TouchBarSegmentedControl, NativeImage, BrowserWindowConstructorOptions, SegmentedControlSegment } from 'electron';
 import { IEnvironmentService, ParsedArgs } from 'vs/platform/environment/common/environment';
 import { ILogService } from 'vs/platform/log/common/log';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
-import { parseArgs } from 'vs/platform/environment/node/argv';
-import product from 'vs/platform/product/node/product';
+import { parseArgs, OPTIONS } from 'vs/platform/environment/node/argv';
+import product from 'vs/platform/product/common/product';
 import { IWindowSettings, MenuBarVisibility, IWindowConfiguration, ReadyState, getTitleBarStyle } from 'vs/platform/windows/common/windows';
 import { Disposable, toDisposable } from 'vs/base/common/lifecycle';
 import { isLinux, isMacintosh, isWindows } from 'vs/base/common/platform';
 import { ICodeWindow, IWindowState, WindowMode } from 'vs/platform/windows/electron-main/windows';
-import { IWorkspaceIdentifier, IWorkspacesMainService } from 'vs/platform/workspaces/common/workspaces';
-import { IBackupMainService } from 'vs/platform/backup/common/backup';
+import { IWorkspaceIdentifier } from 'vs/platform/workspaces/common/workspaces';
+import { IWorkspacesMainService } from 'vs/platform/workspaces/electron-main/workspacesMainService';
+import { IBackupMainService } from 'vs/platform/backup/electron-main/backup';
 import { ISerializableCommandAction } from 'vs/platform/actions/common/actions';
 import * as perf from 'vs/base/common/performance';
 import { resolveMarketplaceHeaders } from 'vs/platform/extensionManagement/common/extensionGalleryService';
@@ -27,7 +28,6 @@ import { IThemeMainService } from 'vs/platform/theme/electron-main/themeMainServ
 import { endsWith } from 'vs/base/common/strings';
 import { RunOnceScheduler } from 'vs/base/common/async';
 import { IFileService } from 'vs/platform/files/common/files';
-import pkg from 'vs/platform/product/node/package';
 
 const RUN_TEXTMATE_IN_WORKER = false;
 
@@ -45,7 +45,7 @@ export const defaultWindowState = function (mode = WindowMode.Normal): IWindowSt
 	};
 };
 
-interface ITouchBarSegment extends Electron.SegmentedControlSegment {
+interface ITouchBarSegment extends SegmentedControlSegment {
 	id: string;
 }
 
@@ -59,7 +59,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 	private hiddenTitleBarStyle: boolean;
 	private showTimeoutHandle: NodeJS.Timeout;
 	private _id: number;
-	private _win: Electron.BrowserWindow;
+	private _win: BrowserWindow;
 	private _lastFocusTime: number;
 	private _readyState: ReadyState;
 	private windowState: IWindowState;
@@ -73,7 +73,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 
 	private marketplaceHeadersPromise: Promise<object>;
 
-	private readonly touchBarGroups: Electron.TouchBarSegmentedControl[];
+	private readonly touchBarGroups: TouchBarSegmentedControl[];
 
 	constructor(
 		config: IWindowCreationOptions,
@@ -114,7 +114,10 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		const [state, hasMultipleDisplays] = this.restoreWindowState(config.state);
 		this.windowState = state;
 
-		const options: Electron.BrowserWindowConstructorOptions = {
+		// in case we are maximized or fullscreen, only show later after the call to maximize/fullscreen (see below)
+		const isFullscreenOrMaximized = (this.windowState.mode === WindowMode.Maximized || this.windowState.mode === WindowMode.Fullscreen);
+
+		const options: BrowserWindowConstructorOptions = {
 			width: this.windowState.width,
 			height: this.windowState.height,
 			x: this.windowState.x,
@@ -286,7 +289,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		return this._id;
 	}
 
-	get win(): Electron.BrowserWindow {
+	get win(): BrowserWindow {
 		return this._win;
 	}
 
@@ -365,7 +368,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 	private handleMarketplaceRequests(): void {
 
 		// Resolve marketplace headers
-		this.marketplaceHeadersPromise = resolveMarketplaceHeaders(pkg.version, this.environmentService, this.fileService);
+		this.marketplaceHeadersPromise = resolveMarketplaceHeaders(product.version, this.environmentService, this.fileService);
 
 		// Inject headers when requests are incoming
 		const urls = ['https://marketplace.visualstudio.com/*', 'https://*.vsassets.io/*'];
@@ -476,7 +479,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		});
 
 		// Window Failed to load
-		this._win.webContents.on('did-fail-load', (event: Electron.Event, errorCode: number, errorDescription: string, validatedURL: string, isMainFrame: boolean) => {
+		this._win.webContents.on('did-fail-load', (event: Event, errorCode: number, errorDescription: string, validatedURL: string, isMainFrame: boolean) => {
 			this.logService.warn('[electron event]: fail to load, ', errorDescription);
 		});
 
@@ -631,7 +634,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		windowConfiguration.partsSplashPath = path.join(this.environmentService.userDataPath, 'rapid_render.json');
 
 		// Config (combination of process.argv and window configuration)
-		const environment = parseArgs(process.argv);
+		const environment = parseArgs(process.argv, OPTIONS);
 		const config = objects.assign(environment, windowConfiguration);
 		for (const key in config) {
 			const configValue = (config as any)[key];
@@ -710,7 +713,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 
 		// only consider non-minimized window states
 		if (mode === WindowMode.Normal || mode === WindowMode.Maximized) {
-			let bounds: Electron.Rectangle;
+			let bounds: Rectangle;
 			if (mode === WindowMode.Normal) {
 				bounds = this.getBounds();
 			} else {
@@ -835,7 +838,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		return undefined;
 	}
 
-	getBounds(): Electron.Rectangle {
+	getBounds(): Rectangle {
 		const pos = this._win.getPosition();
 		const dimension = this._win.getSize();
 
@@ -965,7 +968,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		}
 	}
 
-	onWindowTitleDoubleClick(): void {
+	handleTitleDoubleClick(): void {
 
 		// Respect system settings on mac with regards to title click on windows title
 		if (isMacintosh) {
@@ -1045,7 +1048,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		this._win.setTouchBar(new TouchBar({ items: this.touchBarGroups }));
 	}
 
-	private createTouchBarGroup(items: ISerializableCommandAction[] = []): Electron.TouchBarSegmentedControl {
+	private createTouchBarGroup(items: ISerializableCommandAction[] = []): TouchBarSegmentedControl {
 
 		// Group Segments
 		const segments = this.createTouchBarGroupSegments(items);
@@ -1065,7 +1068,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 
 	private createTouchBarGroupSegments(items: ISerializableCommandAction[] = []): ITouchBarSegment[] {
 		const segments: ITouchBarSegment[] = items.map(item => {
-			let icon: Electron.NativeImage | undefined;
+			let icon: NativeImage | undefined;
 			if (item.iconLocation && item.iconLocation.dark.scheme === 'file') {
 				icon = nativeImage.createFromPath(URI.revive(item.iconLocation.dark).fsPath);
 				if (icon.isEmpty()) {

@@ -97,6 +97,7 @@ export class CursorConfiguration {
 	public readonly emptySelectionClipboard: boolean;
 	public readonly copyWithSyntaxHighlighting: boolean;
 	public readonly multiCursorMergeOverlapping: boolean;
+	public readonly multiCursorPaste: 'spread' | 'full';
 	public readonly autoClosingBrackets: EditorAutoClosingStrategy;
 	public readonly autoClosingQuotes: EditorAutoClosingStrategy;
 	public readonly autoClosingOvertype: EditorAutoClosingOvertypeStrategy;
@@ -116,6 +117,7 @@ export class CursorConfiguration {
 			|| e.hasChanged(EditorOption.wordSeparators)
 			|| e.hasChanged(EditorOption.emptySelectionClipboard)
 			|| e.hasChanged(EditorOption.multiCursorMergeOverlapping)
+			|| e.hasChanged(EditorOption.multiCursorPaste)
 			|| e.hasChanged(EditorOption.autoClosingBrackets)
 			|| e.hasChanged(EditorOption.autoClosingQuotes)
 			|| e.hasChanged(EditorOption.autoClosingOvertype)
@@ -147,6 +149,7 @@ export class CursorConfiguration {
 		this.emptySelectionClipboard = options.get(EditorOption.emptySelectionClipboard);
 		this.copyWithSyntaxHighlighting = options.get(EditorOption.copyWithSyntaxHighlighting);
 		this.multiCursorMergeOverlapping = options.get(EditorOption.multiCursorMergeOverlapping);
+		this.multiCursorPaste = options.get(EditorOption.multiCursorPaste);
 		this.autoClosingBrackets = options.get(EditorOption.autoClosingBrackets);
 		this.autoClosingQuotes = options.get(EditorOption.autoClosingQuotes);
 		this.autoClosingOvertype = options.get(EditorOption.autoClosingOvertype);
@@ -457,7 +460,7 @@ export class CursorState {
 		return CursorState.fromModelState(modelState);
 	}
 
-	public static fromModelSelections(modelSelections: ISelection[]): PartialModelCursorState[] {
+	public static fromModelSelections(modelSelections: readonly ISelection[]): PartialModelCursorState[] {
 		let states: PartialModelCursorState[] = [];
 		for (let i = 0, len = modelSelections.length; i < len; i++) {
 			states[i] = this.fromModelSelection(modelSelections[i]);
