@@ -72,6 +72,7 @@ const indentationFilter = [
 
 	// except multiple specific folders
 	'!**/octicons/**',
+	'!**/fonts/**',
 	'!**/codicon/**',
 	'!**/fixtures/**',
 	'!**/lib/**',

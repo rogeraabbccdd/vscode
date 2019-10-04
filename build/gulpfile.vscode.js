@@ -71,6 +71,7 @@ const vscodeResources = [
 	'out-build/vs/base/browser/ui/codiconLabel/codicon/**',
 	'out-build/vs/workbench/browser/media/*-theme.css',
 	'out-build/vs/workbench/contrib/debug/**/*.json',
+	'out-build/vs/workbench/contrib/fonts/**',
 	'out-build/vs/workbench/contrib/externalTerminal/**/*.scpt',
 	'out-build/vs/workbench/contrib/webview/browser/pre/*.js',
 	'out-build/vs/workbench/contrib/webview/electron-browser/pre/*.js',

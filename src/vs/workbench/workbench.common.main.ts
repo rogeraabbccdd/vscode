@@ -252,4 +252,8 @@ import 'vs/workbench/contrib/feedback/browser/feedback.contribution';
 // User Data Sync
 import 'vs/workbench/contrib/userDataSync/browser/userDataSync.contribution';
 
+// Fonts
+import 'vs/workbench/contrib/fonts/cascadiaCode/cascadiaCode';
+import 'vs/workbench/contrib/fonts/firaCode/firaCode';
+
 //#endregion
