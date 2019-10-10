@@ -238,7 +238,7 @@ class EventCollection<T> implements Collection<T> {
 
 class TreeRenderer<T, TFilterData, TRef, TTemplateData> implements IListRenderer<ITreeNode<T, TFilterData>, ITreeListTemplateData<TTemplateData>> {
 
-	private static DefaultIndent = 8;
+	private static readonly DefaultIndent = 8;
 
 	readonly templateId: string;
 	private renderedElements = new Map<T, ITreeNode<T, TFilterData>>();
@@ -1368,7 +1368,7 @@ export abstract class AbstractTree<T, TFilterData, TRef> implements IDisposable 
 	}
 
 	get scrollLeft(): number {
-		return this.view.scrollTop;
+		return this.view.scrollLeft;
 	}
 
 	set scrollLeft(scrollLeft: number) {
