@@ -264,7 +264,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 
 		if (windowConfig) {
 			if (isWindows && parseFloat(os.release()) >= 10) {
-				if (windowConfig.compositionAttribute && windowConfig.compositionAttribute !== 'none' && this.hasHiddenTitleBarStyle()) {
+				if (windowConfig.compositionAttribute && windowConfig.compositionAttribute !== 'none' && this.hasHiddenTitleBarStyle) {
 					this.setCompositionAttribute(windowConfig.compositionAttribute);
 					applied = true;
 				} else {
