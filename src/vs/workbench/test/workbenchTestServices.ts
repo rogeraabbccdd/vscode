@@ -79,7 +79,7 @@ import { IPanel } from 'vs/workbench/common/panel';
 import { IBadge } from 'vs/workbench/services/activity/common/activity';
 import { ISharedProcessService } from 'vs/platform/ipc/electron-browser/sharedProcessService';
 import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/common/environmentService';
-import { WorkbenchEnvironmentService } from 'vs/workbench/services/environment/node/environmentService';
+import { NativeWorkbenchEnvironmentService } from 'vs/workbench/services/environment/electron-browser/environmentService';
 import { VSBuffer, VSBufferReadable } from 'vs/base/common/buffer';
 import { NativeTextFileService } from 'vs/workbench/services/textfile/electron-browser/nativeTextFileService';
 import { Schemas } from 'vs/base/common/network';
@@ -87,7 +87,7 @@ import { IProductService } from 'vs/platform/product/common/productService';
 import product from 'vs/platform/product/common/product';
 import { IHostService } from 'vs/workbench/services/host/browser/host';
 import { IElectronService } from 'vs/platform/electron/node/electron';
-import { INativeOpenDialogOptions, MessageBoxReturnValue, SaveDialogReturnValue, OpenDialogReturnValue } from 'vs/platform/dialogs/node/dialogs';
+import { INativeOpenDialogOptions } from 'vs/platform/dialogs/node/dialogs';
 import { IBackupMainService, IWorkspaceBackupInfo } from 'vs/platform/backup/electron-main/backup';
 import { IEmptyWindowBackupInfo } from 'vs/platform/backup/node/backup';
 import { IDialogMainService } from 'vs/platform/dialogs/electron-main/dialogs';
@@ -97,7 +97,7 @@ export function createFileInput(instantiationService: IInstantiationService, res
 	return instantiationService.createInstance(FileEditorInput, resource, undefined, undefined);
 }
 
-export const TestEnvironmentService = new WorkbenchEnvironmentService(parseArgs(process.argv, OPTIONS) as IWindowConfiguration, process.execPath, 0);
+export const TestEnvironmentService = new NativeWorkbenchEnvironmentService(parseArgs(process.argv, OPTIONS) as IWindowConfiguration, process.execPath, 0);
 
 export class TestContextService implements IWorkspaceContextService {
 	public _serviceBrand: undefined;
@@ -211,7 +211,8 @@ export class TestTextFileService extends NativeTextFileService {
 		@IFileDialogService fileDialogService: IFileDialogService,
 		@IEditorService editorService: IEditorService,
 		@ITextResourceConfigurationService textResourceConfigurationService: ITextResourceConfigurationService,
-		@IElectronService electronService: IElectronService
+		@IElectronService electronService: IElectronService,
+		@IProductService productService: IProductService
 	) {
 		super(
 			contextService,
@@ -231,7 +232,8 @@ export class TestTextFileService extends NativeTextFileService {
 			fileDialogService,
 			editorService,
 			textResourceConfigurationService,
-			electronService
+			electronService,
+			productService
 		);
 	}
 
@@ -462,14 +464,10 @@ export class TestLayoutService implements IWorkbenchLayoutService {
 	onCenteredLayoutChange: Event<boolean> = Event.None;
 	onFullscreenChange: Event<boolean> = Event.None;
 	onPanelPositionChange: Event<string> = Event.None;
+	onPartVisibilityChange: Event<void> = Event.None;
 	onLayout = Event.None;
 
-	private readonly _onTitleBarVisibilityChange = new Emitter<void>();
 	private readonly _onMenubarVisibilityChange = new Emitter<Dimension>();
-
-	public get onTitleBarVisibilityChange(): Event<void> {
-		return this._onTitleBarVisibilityChange.event;
-	}
 
 	public get onMenubarVisibilityChange(): Event<Dimension> {
 		return this._onMenubarVisibilityChange.event;
@@ -1165,14 +1163,14 @@ export class TestCodeEditorService implements ICodeEditorService {
 	addDiffEditor(_editor: IDiffEditor): void { }
 	removeDiffEditor(_editor: IDiffEditor): void { }
 	listDiffEditors(): IDiffEditor[] { return []; }
-	getFocusedCodeEditor(): ICodeEditor | undefined { return undefined; }
+	getFocusedCodeEditor(): ICodeEditor | null { return null; }
 	registerDecorationType(_key: string, _options: IDecorationRenderOptions, _parentTypeKey?: string): void { }
 	removeDecorationType(_key: string): void { }
 	resolveDecorationOptions(_typeKey: string, _writable: boolean): IModelDecorationOptions { return Object.create(null); }
 	setTransientModelProperty(_model: ITextModel, _key: string, _value: any): void { }
 	getTransientModelProperty(_model: ITextModel, _key: string) { }
-	getActiveCodeEditor(): ICodeEditor | undefined { return undefined; }
-	openCodeEditor(_input: IResourceInput, _source: ICodeEditor, _sideBySide?: boolean): Promise<ICodeEditor | undefined> { return Promise.resolve(undefined); }
+	getActiveCodeEditor(): ICodeEditor | null { return null; }
+	openCodeEditor(_input: IResourceInput, _source: ICodeEditor, _sideBySide?: boolean): Promise<ICodeEditor | null> { return Promise.resolve(null); }
 }
 
 export class TestLifecycleService implements ILifecycleService {
@@ -1347,9 +1345,9 @@ export class TestElectronService implements IElectronService {
 	async minimizeWindow(): Promise<void> { }
 	async isWindowFocused(): Promise<boolean> { return true; }
 	async focusWindow(options?: { windowId?: number | undefined; } | undefined): Promise<void> { }
-	async showMessageBox(options: Electron.MessageBoxOptions): Promise<MessageBoxReturnValue> { throw new Error('Method not implemented.'); }
-	async showSaveDialog(options: Electron.SaveDialogOptions): Promise<SaveDialogReturnValue> { throw new Error('Method not implemented.'); }
-	async showOpenDialog(options: Electron.OpenDialogOptions): Promise<OpenDialogReturnValue> { throw new Error('Method not implemented.'); }
+	async showMessageBox(options: Electron.MessageBoxOptions): Promise<Electron.MessageBoxReturnValue> { throw new Error('Method not implemented.'); }
+	async showSaveDialog(options: Electron.SaveDialogOptions): Promise<Electron.SaveDialogReturnValue> { throw new Error('Method not implemented.'); }
+	async showOpenDialog(options: Electron.OpenDialogOptions): Promise<Electron.OpenDialogReturnValue> { throw new Error('Method not implemented.'); }
 	async pickFileFolderAndOpen(options: INativeOpenDialogOptions): Promise<void> { }
 	async pickFileAndOpen(options: INativeOpenDialogOptions): Promise<void> { }
 	async pickFolderAndOpen(options: INativeOpenDialogOptions): Promise<void> { }
@@ -1373,7 +1371,7 @@ export class TestElectronService implements IElectronService {
 	async toggleDevTools(): Promise<void> { }
 	async startCrashReporter(options: Electron.CrashReporterStartOptions): Promise<void> { }
 	async resolveProxy(url: string): Promise<string | undefined> { return undefined; }
-	async openExtensionDevelopmentHostWindow(args: minimist.ParsedArgs, env: IProcessEnvironment): Promise<void> { }
+	async openExtensionDevelopmentHostWindow(args: string[], env: IProcessEnvironment): Promise<void> { }
 }
 
 export class TestBackupMainService implements IBackupMainService {
@@ -1439,15 +1437,15 @@ export class TestDialogMainService implements IDialogMainService {
 		throw new Error('Method not implemented.');
 	}
 
-	showMessageBox(options: Electron.MessageBoxOptions, window?: Electron.BrowserWindow | undefined): Promise<MessageBoxReturnValue> {
+	showMessageBox(options: Electron.MessageBoxOptions, window?: Electron.BrowserWindow | undefined): Promise<Electron.MessageBoxReturnValue> {
 		throw new Error('Method not implemented.');
 	}
 
-	showSaveDialog(options: Electron.SaveDialogOptions, window?: Electron.BrowserWindow | undefined): Promise<SaveDialogReturnValue> {
+	showSaveDialog(options: Electron.SaveDialogOptions, window?: Electron.BrowserWindow | undefined): Promise<Electron.SaveDialogReturnValue> {
 		throw new Error('Method not implemented.');
 	}
 
-	showOpenDialog(options: Electron.OpenDialogOptions, window?: Electron.BrowserWindow | undefined): Promise<OpenDialogReturnValue> {
+	showOpenDialog(options: Electron.OpenDialogOptions, window?: Electron.BrowserWindow | undefined): Promise<Electron.OpenDialogReturnValue> {
 		throw new Error('Method not implemented.');
 	}
 }

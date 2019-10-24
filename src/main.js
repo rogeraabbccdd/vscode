@@ -19,7 +19,7 @@ const paths = require('./paths');
 // @ts-ignore
 const product = require('../product.json');
 // @ts-ignore
-const app = require('electron').app;
+const { app, protocol } = require('electron');
 
 // Enable portable support
 const portable = bootstrap.configurePortable();
@@ -32,8 +32,21 @@ const args = parseCLIArgs();
 const userDataPath = getUserDataPath(args);
 app.setPath('userData', userDataPath);
 
+// Set logs path before app 'ready' event if running portable
+// to ensure that no 'logs' folder is created on disk at a
+// location outside of the portable directory
+// (https://github.com/microsoft/vscode/issues/56651)
+if (portable.isPortable) {
+	app.setAppLogsPath(path.join(userDataPath, 'logs'));
+}
+
 // Update cwd based on environment and platform
 setCurrentWorkingDirectory();
+
+// Register custom schemes with privileges
+protocol.registerSchemesAsPrivileged([
+	{ scheme: 'vscode-resource', privileges: { secure: true, supportFetchAPI: true, corsEnabled: true } }
+]);
 
 // Global app listeners
 registerListeners();

@@ -230,8 +230,8 @@ export const PANEL_INACTIVE_TITLE_FOREGROUND = registerColor('panelTitle.inactiv
 }, nls.localize('panelInactiveTitleForeground', "Title color for the inactive panel. Panels are shown below the editor area and contain views like output and integrated terminal."));
 
 export const PANEL_ACTIVE_TITLE_BORDER = registerColor('panelTitle.activeBorder', {
-	dark: PANEL_BORDER,
-	light: PANEL_BORDER,
+	dark: PANEL_ACTIVE_TITLE_FOREGROUND,
+	light: PANEL_ACTIVE_TITLE_FOREGROUND,
 	hc: contrastBorder
 }, nls.localize('panelActiveTitleBorder', "Border color for the active panel title. Panels are shown below the editor area and contain views like output and integrated terminal."));
 
@@ -330,8 +330,8 @@ export const ACTIVITY_BAR_FOREGROUND = registerColor('activityBar.foreground', {
 }, nls.localize('activityBarForeground', "Activity bar item foreground color when it is active. The activity bar is showing on the far left or right and allows to switch between views of the side bar."));
 
 export const ACTIVITY_BAR_INACTIVE_FOREGROUND = registerColor('activityBar.inactiveForeground', {
-	dark: transparent(ACTIVITY_BAR_FOREGROUND, 0.6),
-	light: transparent(ACTIVITY_BAR_FOREGROUND, 0.6),
+	dark: transparent(ACTIVITY_BAR_FOREGROUND, 0.4),
+	light: transparent(ACTIVITY_BAR_FOREGROUND, 0.4),
 	hc: Color.white
 }, nls.localize('activityBarInActiveForeground', "Activity bar item foreground color when it is inactive. The activity bar is showing on the far left or right and allows to switch between views of the side bar."));
 
@@ -340,6 +340,18 @@ export const ACTIVITY_BAR_BORDER = registerColor('activityBar.border', {
 	light: null,
 	hc: contrastBorder
 }, nls.localize('activityBarBorder', "Activity bar border color separating to the side bar. The activity bar is showing on the far left or right and allows to switch between views of the side bar."));
+
+export const ACTIVITY_BAR_ACTIVE_BORDER = registerColor('activityBar.activeBorder', {
+	dark: ACTIVITY_BAR_FOREGROUND,
+	light: ACTIVITY_BAR_FOREGROUND,
+	hc: null
+}, nls.localize('activityBarActiveBorder', "Activity bar border color for the active item. The activity bar is showing on the far left or right and allows to switch between views of the side bar."));
+
+export const ACTIVITY_BAR_ACTIVE_BACKGROUND = registerColor('activityBar.activeBackground', {
+	dark: null,
+	light: null,
+	hc: null
+}, nls.localize('activityBarActiveBackground', "Activity bar background color for the active item. The activity bar is showing on the far left or right and allows to switch between views of the side bar."));
 
 export const ACTIVITY_BAR_DRAG_AND_DROP_BACKGROUND = registerColor('activityBar.dropBackground', {
 	dark: Color.white.transparent(0.12),
@@ -571,6 +583,18 @@ export const NOTIFICATIONS_INFO_ICON_FOREGROUND = registerColor('notificationsIn
 	light: editorInfoForeground,
 	hc: editorInfoForeground
 }, nls.localize('notificationsInfoIconForeground', "The color used for the notification info icon."));
+
+export const WINDOW_ACTIVE_BORDER = registerColor('window.activeBorder', {
+	dark: null,
+	light: null,
+	hc: contrastBorder
+}, nls.localize('windowActiveBorder', "The color used for the border of the window when it is active. Only supported in the desktop client."));
+
+export const WINDOW_INACTIVE_BORDER = registerColor('window.inactiveBorder', {
+	dark: null,
+	light: null,
+	hc: contrastBorder
+}, nls.localize('windowInactiveBorder', "The color used for the border of the window when it is inactive. Only supported in the desktop client."));
 
 /**
  * Base class for all themable workbench components.
