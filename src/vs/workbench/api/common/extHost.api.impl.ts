@@ -228,7 +228,7 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 			get uriScheme() { return initData.environment.appUriScheme; },
 			createAppUri(options?) {
 				checkProposedApiEnabled(extension);
-				return extHostUrls.createAppUri(extension.identifier, options);
+				return extHostUrls.proposedCreateAppUri(extension.identifier, options);
 			},
 			get logLevel() {
 				checkProposedApiEnabled(extension);
@@ -248,6 +248,10 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 				return extHostWindow.openUri(uri, { allowTunneling: !!initData.remote.isRemote });
 			},
 			asExternalUri(uri: URI) {
+				if (uri.scheme === initData.environment.appUriScheme) {
+					return extHostUrls.createAppUri(uri);
+				}
+
 				return extHostWindow.asExternalUri(uri, { allowTunneling: !!initData.remote.isRemote });
 			},
 			get remoteName() {
@@ -369,8 +373,7 @@ export function createApiFactoryAndRegisterActors(accessor: ServicesAccessor): I
 			registerSelectionRangeProvider(selector: vscode.DocumentSelector, provider: vscode.SelectionRangeProvider): vscode.Disposable {
 				return extHostLanguageFeatures.registerSelectionRangeProvider(extension, selector, provider);
 			},
-			registerCallHierarchyProvider(selector: vscode.DocumentSelector, provider: vscode.CallHierarchyItemProvider): vscode.Disposable {
-				checkProposedApiEnabled(extension);
+			registerCallHierarchyProvider(selector: vscode.DocumentSelector, provider: vscode.CallHierarchyProvider): vscode.Disposable {
 				return extHostLanguageFeatures.registerCallHierarchyProvider(extension, selector, provider);
 			},
 			setLanguageConfiguration: (language: string, configuration: vscode.LanguageConfiguration): vscode.Disposable => {

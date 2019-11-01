@@ -16,89 +16,6 @@
 
 declare module 'vscode' {
 
-	//#region Joh - call hierarchy
-
-	export class CallHierarchyItem {
-		/**
-		 * The name of this item.
-		 */
-		name: string;
-
-		/**
-		 * The kind of this item.
-		 */
-		kind: SymbolKind;
-
-		/**
-		 * Tags for this item.
-		 */
-		tags?: ReadonlyArray<SymbolTag>;
-
-		/**
-		 * More detail for this item, e.g. the signature of a function.
-		 */
-		detail?: string;
-
-		/**
-		 * The resource identifier of this item.
-		 */
-		uri: Uri;
-
-		/**
-		 * The range enclosing this symbol not including leading/trailing whitespace but everything else, e.g. comments and code.
-		 */
-		range: Range;
-
-		/**
-		 * The range that should be selected and reveal when this symbol is being picked, e.g. the name of a function.
-		 * Must be contained by the [`range`](#CallHierarchyItem.range).
-		 */
-		selectionRange: Range;
-
-		constructor(kind: SymbolKind, name: string, detail: string, uri: Uri, range: Range, selectionRange: Range);
-	}
-
-	export class CallHierarchyIncomingCall {
-		from: CallHierarchyItem;
-		fromRanges: Range[];
-		constructor(item: CallHierarchyItem, fromRanges: Range[]);
-	}
-
-	export class CallHierarchyOutgoingCall {
-		fromRanges: Range[];
-		to: CallHierarchyItem;
-		constructor(item: CallHierarchyItem, fromRanges: Range[]);
-	}
-
-	export interface CallHierarchyItemProvider {
-
-		/**
-		 * Provide a list of callers for the provided item, e.g. all function calling a function.
-		 */
-		provideCallHierarchyIncomingCalls(document: TextDocument, position: Position, token: CancellationToken): ProviderResult<CallHierarchyIncomingCall[]>;
-
-		/**
-		 * Provide a list of calls for the provided item, e.g. all functions call from a function.
-		 */
-		provideCallHierarchyOutgoingCalls(document: TextDocument, position: Position, token: CancellationToken): ProviderResult<CallHierarchyOutgoingCall[]>;
-
-		//  todo@joh this could return as 'prepareCallHierarchy' (similar to the RenameProvider#prepareRename)
-		//
-		// /**
-		//  *
-		//  * Given a document and position compute a call hierarchy item. This is justed as
-		//  * anchor for call hierarchy and then `resolveCallHierarchyItem` is being called.
-		//  */
-		// resolveCallHierarchyItem(document: TextDocument, position: Position, token: CancellationToken): ProviderResult<CallHierarchyItem>;
-	}
-
-	export namespace languages {
-		export function registerCallHierarchyProvider(selector: DocumentSelector, provider: CallHierarchyItemProvider): Disposable;
-	}
-
-	//#endregion
-
-
 	//#region Alex - resolvers
 
 	export interface RemoteAuthorityResolverContext {
@@ -938,33 +855,7 @@ declare module 'vscode' {
 	export namespace env {
 
 		/**
-		 * Creates a Uri that - if opened in a browser - will result in a
-		 * registered [UriHandler](#UriHandler) to fire. The handler's
-		 * Uri will be configured with the path, query and fragment of
-		 * [AppUriOptions](#AppUriOptions) if provided, otherwise it will be empty.
-		 *
-		 * Extensions should not make any assumptions about the resulting
-		 * Uri and should not alter it in anyway. Rather, extensions can e.g.
-		 * use this Uri in an authentication flow, by adding the Uri as
-		 * callback query argument to the server to authenticate to.
-		 *
-		 * Note: If the server decides to add additional query parameters to the Uri
-		 * (e.g. a token or secret), it will appear in the Uri that is passed
-		 * to the [UriHandler](#UriHandler).
-		 *
-		 * **Example** of an authentication flow:
-		 * ```typescript
-		 * vscode.window.registerUriHandler({
-		 *   handleUri(uri: vscode.Uri): vscode.ProviderResult<void> {
-		 *     if (uri.path === '/did-authenticate') {
-		 *       console.log(uri.toString());
-		 *     }
-		 *   }
-		 * });
-		 *
-		 * const callableUri = await vscode.env.createAppUri({ payload: { path: '/did-authenticate' } });
-		 * await vscode.env.openExternal(callableUri);
-		 * ```
+		 * @deprecated use `vscode.env.asExternalUri` instead.
 		 */
 		export function createAppUri(options?: AppUriOptions): Thenable<Uri>;
 	}
@@ -994,6 +885,26 @@ declare module 'vscode' {
 			provider: WebviewEditorProvider,
 			options?: WebviewPanelOptions
 		): Disposable;
+	}
+
+	//#endregion
+
+	//#region joh, insert/replace completions: https://github.com/microsoft/vscode/issues/10266
+
+	export interface CompletionItem {
+
+		/**
+		 * A range or a insert and replace range selecting the text that should be replaced by this completion item.
+		 *
+		 * When omitted, the range of the [current word](#TextDocument.getWordRangeAtPosition) is used as replace-range
+		 * and as insert-range the start of the [current word](#TextDocument.getWordRangeAtPosition) to the
+		 * current position is used.
+		 *
+		 * *Note 1:* A range must be a [single line](#Range.isSingleLine) and it must
+		 * [contain](#Range.contains) the position at which completion has been [requested](#CompletionItemProvider.provideCompletionItems).
+		 * *Note 2:* A insert range must be a prefix of a replace range, that means it must be contained and starting at the same position.
+		 */
+		range2?: Range | { insert: Range; replace: Range; };
 	}
 
 	//#endregion

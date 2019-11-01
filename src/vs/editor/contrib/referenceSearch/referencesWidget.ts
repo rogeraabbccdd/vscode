@@ -31,9 +31,7 @@ import { activeContrastBorder, contrastBorder, registerColor } from 'vs/platform
 import { ITheme, IThemeService, registerThemingParticipant } from 'vs/platform/theme/common/themeService';
 import { PeekViewWidget, IPeekViewService } from './peekViewWidget';
 import { FileReferences, OneReference, ReferencesModel } from './referencesModel';
-import { ITreeRenderer, IAsyncDataSource } from 'vs/base/browser/ui/tree/tree';
 import { IAsyncDataTreeOptions } from 'vs/base/browser/ui/tree/asyncDataTree';
-import { IListVirtualDelegate } from 'vs/base/browser/ui/list/list';
 import { FuzzyScore } from 'vs/base/common/filters';
 import { SplitView, Sizing } from 'vs/base/browser/ui/splitview/splitview';
 
@@ -55,7 +53,7 @@ class DecorationsManager implements IDisposable {
 		this._onModelChanged();
 	}
 
-	public dispose(): void {
+	dispose(): void {
 		this._callOnModelChange.dispose();
 		this._callOnDispose.dispose();
 		this.removeDecorations();
@@ -147,7 +145,7 @@ class DecorationsManager implements IDisposable {
 		this._editor.deltaDecorations(toRemove, []);
 	}
 
-	public removeDecorations(): void {
+	removeDecorations(): void {
 		let toRemove: string[] = [];
 		this._decorations.forEach((value, key) => {
 			toRemove.push(key);
@@ -158,8 +156,8 @@ class DecorationsManager implements IDisposable {
 }
 
 export class LayoutData {
-	public ratio: number = 0.7;
-	public heightInLines: number = 18;
+	ratio: number = 0.7;
+	heightInLines: number = 18;
 
 	static fromJSON(raw: string): LayoutData {
 		let ratio: number | undefined;
@@ -311,7 +309,7 @@ export class ReferenceWidget extends PeekViewWidget {
 			keyboardNavigationLabelProvider: this._instantiationService.createInstance(StringRepresentationProvider),
 			identityProvider: new IdentityProvider()
 		};
-		this._tree = this._instantiationService.createInstance<string, HTMLElement, IListVirtualDelegate<TreeElement>, ITreeRenderer<any, FuzzyScore, any>[], IAsyncDataSource<ReferencesModel | FileReferences, TreeElement>, IAsyncDataTreeOptions<TreeElement, FuzzyScore>, WorkbenchAsyncDataTree<ReferencesModel | FileReferences, TreeElement, FuzzyScore>>(
+		this._tree = this._instantiationService.createInstance<typeof WorkbenchAsyncDataTree, WorkbenchAsyncDataTree<ReferencesModel | FileReferences, TreeElement, FuzzyScore>>(
 			WorkbenchAsyncDataTree,
 			'ReferencesWidget',
 			this._treeContainer,
@@ -399,7 +397,7 @@ export class ReferenceWidget extends PeekViewWidget {
 		this._splitView.resizeView(0, widthInPixel * this.layoutData.ratio);
 	}
 
-	public setSelection(selection: OneReference): Promise<any> {
+	setSelection(selection: OneReference): Promise<any> {
 		return this._revealReference(selection, true).then(() => {
 			if (!this._model) {
 				// disposed
@@ -411,7 +409,7 @@ export class ReferenceWidget extends PeekViewWidget {
 		});
 	}
 
-	public setModel(newModel: ReferencesModel | undefined): Promise<any> {
+	setModel(newModel: ReferencesModel | undefined): Promise<any> {
 		// clean up
 		this._disposeOnNewModel.clear();
 		this._model = newModel;
@@ -426,7 +424,7 @@ export class ReferenceWidget extends PeekViewWidget {
 			return Promise.resolve(undefined);
 		}
 
-		if (this._model.empty) {
+		if (this._model.isEmpty) {
 			this.setTitle('');
 			this._messageContainer.innerHTML = nls.localize('noResults', "No results");
 			dom.show(this._messageContainer);

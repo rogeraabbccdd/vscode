@@ -131,7 +131,7 @@ declare namespace monaco {
 		 *
 		 * @param value A string which represents an Uri (see `Uri#toString`).
 		 */
-		static parse(value: string): Uri;
+		static parse(value: string, _strict?: boolean): Uri;
 		/**
 		 * Creates a new Uri from a file system path, e.g. `c:\my\files`,
 		 * `/usr/home`, or `\\server\share\some\path`.
@@ -2483,6 +2483,12 @@ declare namespace monaco.editor {
 		*/
 		cursorSurroundingLines?: number;
 		/**
+		 * Controls when `cursorSurroundingLines` should be enforced
+		 * Defaults to `default`, `cursorSurroundingLines` is not enforced when cursor position is changed
+		 * by mouse.
+		*/
+		cursorSurroundingLinesStyle?: 'default' | 'all';
+		/**
 		 * Render last line number when the file ends with a newline.
 		 * Defaults to true.
 		*/
@@ -3046,9 +3052,9 @@ declare namespace monaco.editor {
 		 */
 		seedSearchStringFromSelection?: boolean;
 		/**
-		 * Controls if Find in Selection flag is turned on when multiple lines of text are selected in the editor.
+		 * Controls if Find in Selection flag is turned on in the editor.
 		 */
-		autoFindInSelection?: boolean;
+		autoFindInSelection?: 'never' | 'always' | 'multiline';
 		addExtraSpaceOnTop?: boolean;
 	}
 
@@ -3409,9 +3415,105 @@ declare namespace monaco.editor {
 		 */
 		maxVisibleSuggestions?: number;
 		/**
-		 * Names of suggestion types to filter.
+		 * Show method-suggestions.
 		 */
-		filteredTypes?: Record<string, boolean>;
+		showMethods?: boolean;
+		/**
+		 * Show function-suggestions.
+		 */
+		showFunctions?: boolean;
+		/**
+		 * Show constructor-suggestions.
+		 */
+		showConstructors?: boolean;
+		/**
+		 * Show field-suggestions.
+		 */
+		showFields?: boolean;
+		/**
+		 * Show variable-suggestions.
+		 */
+		showVariables?: boolean;
+		/**
+		 * Show class-suggestions.
+		 */
+		showClasses?: boolean;
+		/**
+		 * Show struct-suggestions.
+		 */
+		showStructs?: boolean;
+		/**
+		 * Show interface-suggestions.
+		 */
+		showInterfaces?: boolean;
+		/**
+		 * Show module-suggestions.
+		 */
+		showModules?: boolean;
+		/**
+		 * Show property-suggestions.
+		 */
+		showProperties?: boolean;
+		/**
+		 * Show event-suggestions.
+		 */
+		showEvents?: boolean;
+		/**
+		 * Show operator-suggestions.
+		 */
+		showOperators?: boolean;
+		/**
+		 * Show unit-suggestions.
+		 */
+		showUnits?: boolean;
+		/**
+		 * Show value-suggestions.
+		 */
+		showValues?: boolean;
+		/**
+		 * Show constant-suggestions.
+		 */
+		showConstants?: boolean;
+		/**
+		 * Show enum-suggestions.
+		 */
+		showEnums?: boolean;
+		/**
+		 * Show enumMember-suggestions.
+		 */
+		showEnumMembers?: boolean;
+		/**
+		 * Show keyword-suggestions.
+		 */
+		showKeywords?: boolean;
+		/**
+		 * Show text-suggestions.
+		 */
+		showWords?: boolean;
+		/**
+		 * Show color-suggestions.
+		 */
+		showColors?: boolean;
+		/**
+		 * Show file-suggestions.
+		 */
+		showFiles?: boolean;
+		/**
+		 * Show reference-suggestions.
+		 */
+		showReferences?: boolean;
+		/**
+		 * Show folder-suggestions.
+		 */
+		showFolders?: boolean;
+		/**
+		 * Show typeParameter-suggestions.
+		 */
+		showTypeParameters?: boolean;
+		/**
+		 * Show snippet-suggestions.
+		 */
+		showSnippets?: boolean;
 	}
 
 	export type InternalSuggestOptions = Readonly<Required<ISuggestOptions>>;
@@ -4777,7 +4879,10 @@ declare namespace monaco.languages {
 		 * *Note:* The range must be a [single line](#Range.isSingleLine) and it must
 		 * [contain](#Range.contains) the position at which completion has been [requested](#CompletionItemProvider.provideCompletionItems).
 		 */
-		range: IRange;
+		range: IRange | {
+			insert: IRange;
+			replace: IRange;
+		};
 		/**
 		 * An optional set of characters that when pressed while this completion is active will accept it first and
 		 * then type that character. *Note* that all commit characters should have `length=1` and that superfluous

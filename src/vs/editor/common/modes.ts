@@ -19,7 +19,6 @@ import { LanguageFeatureRegistry } from 'vs/editor/common/modes/languageFeatureR
 import { TokenizationRegistryImpl } from 'vs/editor/common/modes/tokenizationRegistry';
 import { ExtensionIdentifier } from 'vs/platform/extensions/common/extensions';
 import { IMarkerData } from 'vs/platform/markers/common/markers';
-import { keys } from 'vs/base/common/map';
 
 /**
  * Open ended enum at runtime
@@ -453,7 +452,7 @@ export interface CompletionItem {
 	 * *Note:* The range must be a [single line](#Range.isSingleLine) and it must
 	 * [contain](#Range.contains) the position at which completion has been [requested](#CompletionItemProvider.provideCompletionItems).
 	 */
-	range: IRange;
+	range: IRange | { insert: IRange, replace: IRange };
 	/**
 	 * An optional set of characters that when pressed while this completion is active will accept it first and
 	 * then type that character. *Note* that all commit characters should have `length=1` and that superfluous
@@ -937,12 +936,6 @@ export namespace SymbolKinds {
 	 */
 	export function fromString(value: string): SymbolKind | undefined {
 		return byName.get(value);
-	}
-	/**
-	 * @internal
-	 */
-	export function names(): readonly string[] {
-		return keys(byName);
 	}
 	/**
 	 * @internal
