@@ -469,7 +469,7 @@ export class TerminalInstance extends Disposable implements ITerminalInstance {
 			fastScrollModifier: 'alt',
 			fastScrollSensitivity: editorOptions.fastScrollSensitivity,
 			scrollSensitivity: editorOptions.mouseWheelScrollSensitivity,
-			rendererType: config.rendererType === 'auto' ? 'canvas' : config.rendererType
+			rendererType: config.rendererType === 'auto' ? 'canvas' : config.rendererType,
 			allowTransparency: true
 		});
 		this._xterm = xterm;
