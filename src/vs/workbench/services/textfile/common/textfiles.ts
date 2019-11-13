@@ -4,17 +4,17 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { URI } from 'vs/base/common/uri';
-import { Event } from 'vs/base/common/event';
+import { Event, IWaitUntil } from 'vs/base/common/event';
 import { IDisposable } from 'vs/base/common/lifecycle';
 import { IEncodingSupport, ConfirmResult, IRevertOptions, IModeSupport } from 'vs/workbench/common/editor';
-import { IBaseStatWithMetadata, IFileStatWithMetadata, IReadFileOptions, IWriteFileOptions, FileOperationError, FileOperationResult } from 'vs/platform/files/common/files';
+import { IBaseStatWithMetadata, IFileStatWithMetadata, IReadFileOptions, IWriteFileOptions, FileOperationError, FileOperationResult, FileOperation } from 'vs/platform/files/common/files';
 import { createDecorator } from 'vs/platform/instantiation/common/instantiation';
 import { ITextEditorModel } from 'vs/editor/common/services/resolverService';
 import { ITextBufferFactory, ITextModel, ITextSnapshot } from 'vs/editor/common/model';
-import { RawContextKey } from 'vs/platform/contextkey/common/contextkey';
 import { VSBuffer, VSBufferReadable } from 'vs/base/common/buffer';
 import { isUndefinedOrNull } from 'vs/base/common/types';
 import { isNative } from 'vs/base/common/platform';
+import { IWorkingCopy } from 'vs/workbench/services/workingCopy/common/workingCopyService';
 
 export const ITextFileService = createDecorator<ITextFileService>('textFileService');
 
@@ -22,13 +22,19 @@ export interface ITextFileService extends IDisposable {
 
 	_serviceBrand: undefined;
 
-	readonly onWillMove: Event<IWillMoveEvent>;
-
-	readonly onAutoSaveConfigurationChange: Event<IAutoSaveConfiguration>;
-
 	readonly onFilesAssociationChange: Event<void>;
 
 	readonly isHotExitEnabled: boolean;
+
+	/**
+	 * An event that is fired before attempting a certain file operation.
+	 */
+	readonly onWillRunOperation: Event<FileOperationWillRunEvent>;
+
+	/**
+	 * An event that is fired after a file operation has been performed.
+	 */
+	readonly onDidRunOperation: Event<FileOperationDidRunEvent>;
 
 	/**
 	 * Access to the manager of text file editor models providing further methods to work with them.
@@ -135,17 +141,36 @@ export interface ITextFileService extends IDisposable {
 	 * confirming for all dirty resources.
 	 */
 	confirmSave(resources?: URI[]): Promise<ConfirmResult>;
-
-	/**
-	 * Convenient fast access to the current auto save mode.
-	 */
-	getAutoSaveMode(): AutoSaveMode;
-
-	/**
-	 * Convenient fast access to the raw configured auto save settings.
-	 */
-	getAutoSaveConfiguration(): IAutoSaveConfiguration;
 }
+
+
+export class FileOperationWillRunEvent implements IWaitUntil {
+
+	constructor(
+		private _thenables: Promise<any>[],
+		readonly operation: FileOperation,
+		readonly target: URI,
+		readonly source?: URI | undefined
+	) { }
+
+	waitUntil(thenable: Promise<any>): void {
+		if (Object.isFrozen(this._thenables)) {
+			throw new Error('waitUntil cannot be used aync');
+		}
+		this._thenables.push(thenable);
+	}
+}
+
+
+export class FileOperationDidRunEvent {
+
+	constructor(
+		readonly operation: FileOperation,
+		readonly target: URI,
+		readonly source?: URI | undefined
+	) { }
+}
+
 
 export interface IReadTextFileOptions extends IReadFileOptions {
 
@@ -291,7 +316,7 @@ export class TextFileModelChangeEvent {
 	private _resource: URI;
 
 	constructor(model: ITextFileEditorModel, private _kind: StateChange) {
-		this._resource = model.getResource();
+		this._resource = model.resource;
 	}
 
 	get resource(): URI {
@@ -303,8 +328,6 @@ export class TextFileModelChangeEvent {
 	}
 }
 
-export const AutoSaveContext = new RawContextKey<string>('config.files.autoSave', undefined);
-
 export interface ITextFileOperationResult {
 	results: IResult[];
 }
@@ -313,20 +336,6 @@ export interface IResult {
 	source: URI;
 	target?: URI;
 	success?: boolean;
-}
-
-export interface IAutoSaveConfiguration {
-	autoSaveDelay?: number;
-	autoSaveFocusChange: boolean;
-	autoSaveApplicationChange: boolean;
-}
-
-export const enum AutoSaveMode {
-	OFF,
-	AFTER_SHORT_DELAY,
-	AFTER_LONG_DELAY,
-	ON_FOCUS_CHANGE,
-	ON_WINDOW_CHANGE
 }
 
 export const enum SaveReason {
@@ -455,12 +464,10 @@ export interface ILoadOptions {
 	reason?: LoadReason;
 }
 
-export interface ITextFileEditorModel extends ITextEditorModel, IEncodingSupport, IModeSupport {
+export interface ITextFileEditorModel extends ITextEditorModel, IEncodingSupport, IModeSupport, IWorkingCopy {
 
 	readonly onDidContentChange: Event<StateChange>;
 	readonly onDidStateChange: Event<StateChange>;
-
-	getResource(): URI;
 
 	hasState(state: ModelState): boolean;
 
@@ -490,13 +497,6 @@ export interface IResolvedTextFileEditorModel extends ITextFileEditorModel {
 	readonly textEditorModel: ITextModel;
 
 	createSnapshot(): ITextSnapshot;
-}
-
-export interface IWillMoveEvent {
-	oldResource: URI;
-	newResource: URI;
-
-	waitUntil(p: Promise<unknown>): void;
 }
 
 /**

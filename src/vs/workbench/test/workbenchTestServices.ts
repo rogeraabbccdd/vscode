@@ -11,7 +11,7 @@ import * as resources from 'vs/base/common/resources';
 import { URI, UriComponents } from 'vs/base/common/uri';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
-import { ConfirmResult, IEditorInputWithOptions, CloseDirection, IEditorIdentifier, IUntitledResourceInput, IResourceDiffInput, IResourceSideBySideInput, IEditorInput, IEditor, IEditorCloseEvent, IEditorPartOptions } from 'vs/workbench/common/editor';
+import { ConfirmResult, IEditorInputWithOptions, CloseDirection, IEditorIdentifier, IUntitledTextResourceInput, IResourceDiffInput, IResourceSideBySideInput, IEditorInput, IEditor, IEditorCloseEvent, IEditorPartOptions } from 'vs/workbench/common/editor';
 import { IEditorOpeningEvent, EditorServiceImpl, IEditorGroupView } from 'vs/workbench/browser/parts/editor/editor';
 import { Event, Emitter } from 'vs/base/common/event';
 import Severity from 'vs/base/common/severity';
@@ -21,7 +21,7 @@ import { IWorkbenchLayoutService, Parts, Position as PartPosition } from 'vs/wor
 import { TextModelResolverService } from 'vs/workbench/services/textmodelResolver/common/textModelResolverService';
 import { ITextModelService } from 'vs/editor/common/services/resolverService';
 import { IEditorOptions, IResourceInput } from 'vs/platform/editor/common/editor';
-import { IUntitledEditorService, UntitledEditorService } from 'vs/workbench/services/untitled/common/untitledEditorService';
+import { IUntitledTextEditorService, UntitledTextEditorService } from 'vs/workbench/services/untitled/common/untitledTextEditorService';
 import { IWorkspaceContextService, IWorkspace as IWorkbenchWorkspace, WorkbenchState, IWorkspaceFolder, IWorkspaceFoldersChangeEvent, Workspace } from 'vs/platform/workspace/common/workspace';
 import { ILifecycleService, BeforeShutdownEvent, ShutdownReason, StartupKind, LifecyclePhase, WillShutdownEvent } from 'vs/platform/lifecycle/common/lifecycle';
 import { ServiceCollection } from 'vs/platform/instantiation/common/serviceCollection';
@@ -92,6 +92,8 @@ import { IBackupMainService, IWorkspaceBackupInfo } from 'vs/platform/backup/ele
 import { IEmptyWindowBackupInfo } from 'vs/platform/backup/node/backup';
 import { IDialogMainService } from 'vs/platform/dialogs/electron-main/dialogs';
 import { find } from 'vs/base/common/arrays';
+import { WorkingCopyService, IWorkingCopyService } from 'vs/workbench/services/workingCopy/common/workingCopyService';
+import { IAutoSaveConfigurationService, AutoSaveConfigurationService } from 'vs/workbench/services/autoSaveConfiguration/common/autoSaveConfigurationService';
 
 export function createFileInput(instantiationService: IInstantiationService, resource: URI): FileEditorInput {
 	return instantiationService.createInstance(FileEditorInput, resource, undefined, undefined);
@@ -196,7 +198,7 @@ export class TestTextFileService extends NativeTextFileService {
 	constructor(
 		@IWorkspaceContextService contextService: IWorkspaceContextService,
 		@IFileService protected fileService: IFileService,
-		@IUntitledEditorService untitledEditorService: IUntitledEditorService,
+		@IUntitledTextEditorService untitledTextEditorService: IUntitledTextEditorService,
 		@ILifecycleService lifecycleService: ILifecycleService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@IConfigurationService configurationService: IConfigurationService,
@@ -206,18 +208,18 @@ export class TestTextFileService extends NativeTextFileService {
 		@INotificationService notificationService: INotificationService,
 		@IBackupFileService backupFileService: IBackupFileService,
 		@IHistoryService historyService: IHistoryService,
-		@IContextKeyService contextKeyService: IContextKeyService,
 		@IDialogService dialogService: IDialogService,
 		@IFileDialogService fileDialogService: IFileDialogService,
 		@IEditorService editorService: IEditorService,
 		@ITextResourceConfigurationService textResourceConfigurationService: ITextResourceConfigurationService,
 		@IElectronService electronService: IElectronService,
-		@IProductService productService: IProductService
+		@IProductService productService: IProductService,
+		@IAutoSaveConfigurationService autoSaveConfigurationService: IAutoSaveConfigurationService
 	) {
 		super(
 			contextService,
 			fileService,
-			untitledEditorService,
+			untitledTextEditorService,
 			lifecycleService,
 			instantiationService,
 			configurationService,
@@ -227,13 +229,13 @@ export class TestTextFileService extends NativeTextFileService {
 			notificationService,
 			backupFileService,
 			historyService,
-			contextKeyService,
 			dialogService,
 			fileDialogService,
 			editorService,
 			textResourceConfigurationService,
 			electronService,
-			productService
+			productService,
+			autoSaveConfigurationService
 		);
 	}
 
@@ -262,6 +264,7 @@ export class TestTextFileService extends NativeTextFileService {
 				resource: content.resource,
 				name: content.name,
 				mtime: content.mtime,
+				ctime: content.ctime,
 				etag: content.etag,
 				encoding: 'utf8',
 				value: await createTextBufferFactoryFromStream(content.value),
@@ -295,13 +298,15 @@ export class TestTextFileService extends NativeTextFileService {
 export function workbenchInstantiationService(): IInstantiationService {
 	let instantiationService = new TestInstantiationService(new ServiceCollection([ILifecycleService, new TestLifecycleService()]));
 	instantiationService.stub(IEnvironmentService, TestEnvironmentService);
-	instantiationService.stub(IContextKeyService, <IContextKeyService>instantiationService.createInstance(MockContextKeyService));
+	const contextKeyService = <IContextKeyService>instantiationService.createInstance(MockContextKeyService);
+	instantiationService.stub(IContextKeyService, contextKeyService);
 	const workspaceContextService = new TestContextService(TestWorkspace);
 	instantiationService.stub(IWorkspaceContextService, workspaceContextService);
 	const configService = new TestConfigurationService();
 	instantiationService.stub(IConfigurationService, configService);
+	instantiationService.stub(IAutoSaveConfigurationService, new AutoSaveConfigurationService(contextKeyService, configService));
 	instantiationService.stub(ITextResourceConfigurationService, new TestTextResourceConfigurationService(configService));
-	instantiationService.stub(IUntitledEditorService, instantiationService.createInstance(UntitledEditorService));
+	instantiationService.stub(IUntitledTextEditorService, instantiationService.createInstance(UntitledTextEditorService));
 	instantiationService.stub(IStorageService, new TestStorageService());
 	instantiationService.stub(IWorkbenchLayoutService, new TestLayoutService());
 	instantiationService.stub(IElectronService, new TestElectronService());
@@ -313,7 +318,7 @@ export function workbenchInstantiationService(): IInstantiationService {
 	instantiationService.stub(IBackupFileService, new TestBackupFileService());
 	instantiationService.stub(ITelemetryService, NullTelemetryService);
 	instantiationService.stub(INotificationService, new TestNotificationService());
-	instantiationService.stub(IUntitledEditorService, instantiationService.createInstance(UntitledEditorService));
+	instantiationService.stub(IUntitledTextEditorService, instantiationService.createInstance(UntitledTextEditorService));
 	instantiationService.stub(IMenuService, new TestMenuService());
 	instantiationService.stub(IKeybindingService, new MockKeybindingService());
 	instantiationService.stub(IDecorationsService, new TestDecorationsService());
@@ -329,6 +334,7 @@ export function workbenchInstantiationService(): IInstantiationService {
 	instantiationService.stub(IEditorService, editorService);
 	instantiationService.stub(ICodeEditorService, new TestCodeEditorService());
 	instantiationService.stub(IViewletService, new TestViewletService());
+	instantiationService.stub(IWorkingCopyService, new TestWorkingCopyService());
 
 	return instantiationService;
 }
@@ -898,11 +904,11 @@ export class TestEditorService implements EditorServiceImpl {
 		throw new Error('not implemented');
 	}
 
-	isOpen(_editor: IEditorInput | IResourceInput | IUntitledResourceInput): boolean {
+	isOpen(_editor: IEditorInput | IResourceInput | IUntitledTextResourceInput): boolean {
 		return false;
 	}
 
-	getOpened(_editor: IEditorInput | IResourceInput | IUntitledResourceInput): IEditorInput {
+	getOpened(_editor: IEditorInput | IResourceInput | IUntitledTextResourceInput): IEditorInput {
 		throw new Error('not implemented');
 	}
 
@@ -914,7 +920,7 @@ export class TestEditorService implements EditorServiceImpl {
 		throw new Error('not implemented');
 	}
 
-	createInput(_input: IResourceInput | IUntitledResourceInput | IResourceDiffInput | IResourceSideBySideInput): IEditorInput {
+	createInput(_input: IResourceInput | IUntitledTextResourceInput | IResourceDiffInput | IResourceSideBySideInput): IEditorInput {
 		throw new Error('not implemented');
 	}
 }
@@ -974,7 +980,9 @@ export class TestFileService implements IFileService {
 			encoding: 'utf8',
 			mtime: Date.now(),
 			size: 42,
+			isFile: true,
 			isDirectory: false,
+			isSymbolicLink: false,
 			name: resources.basename(resource)
 		});
 	}
@@ -996,6 +1004,7 @@ export class TestFileService implements IFileService {
 			etag: 'index.txt',
 			encoding: 'utf8',
 			mtime: Date.now(),
+			ctime: Date.now(),
 			name: resources.basename(resource),
 			size: 1
 		});
@@ -1022,6 +1031,7 @@ export class TestFileService implements IFileService {
 			etag: 'index.txt',
 			encoding: 'utf8',
 			mtime: Date.now(),
+			ctime: Date.now(),
 			size: 1,
 			name: resources.basename(resource)
 		});
@@ -1033,8 +1043,11 @@ export class TestFileService implements IFileService {
 			etag: 'index.txt',
 			encoding: 'utf8',
 			mtime: Date.now(),
+			ctime: Date.now(),
 			size: 42,
+			isFile: true,
 			isDirectory: false,
+			isSymbolicLink: false,
 			name: resources.basename(resource)
 		}));
 	}
@@ -1456,3 +1469,5 @@ export class TestDialogMainService implements IDialogMainService {
 		throw new Error('Method not implemented.');
 	}
 }
+
+export class TestWorkingCopyService extends WorkingCopyService { }

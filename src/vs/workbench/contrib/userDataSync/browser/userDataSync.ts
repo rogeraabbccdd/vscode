@@ -25,7 +25,6 @@ import { IWorkbenchEnvironmentService } from 'vs/workbench/services/environment/
 import { isEqual } from 'vs/base/common/resources';
 import { IEditorInput } from 'vs/workbench/common/editor';
 import { IAuthTokenService, AuthTokenStatus } from 'vs/platform/auth/common/auth';
-import { IQuickInputService } from 'vs/platform/quickinput/common/quickInput';
 import { timeout } from 'vs/base/common/async';
 
 const CONTEXT_AUTH_TOKEN_STATE = new RawContextKey<string>('authTokenStatus', AuthTokenStatus.Inactive);
@@ -51,7 +50,6 @@ export class UserDataSyncWorkbenchContribution extends Disposable implements IWo
 		@ITextFileService private readonly textFileService: ITextFileService,
 		@IHistoryService private readonly historyService: IHistoryService,
 		@IWorkbenchEnvironmentService private readonly workbenchEnvironmentService: IWorkbenchEnvironmentService,
-		@IQuickInputService private readonly quickInputService: IQuickInputService,
 	) {
 		super();
 		this.syncStatusContext = CONTEXT_SYNC_STATE.bindTo(contextKeyService);
@@ -65,7 +63,7 @@ export class UserDataSyncWorkbenchContribution extends Disposable implements IWo
 		this.registerActions();
 
 		timeout(2000).then(() => {
-			if (this.authTokenService.status === AuthTokenStatus.Inactive && configurationService.getValue<boolean>('configurationSync.enable')) {
+			if (this.authTokenService.status === AuthTokenStatus.Inactive && this.userDataSyncService.status !== SyncStatus.Uninitialized && configurationService.getValue<boolean>('configurationSync.enable')) {
 				this.showSignInNotification();
 			}
 		});
@@ -111,7 +109,7 @@ export class UserDataSyncWorkbenchContribution extends Disposable implements IWo
 		let badge: IBadge | undefined = undefined;
 		let clazz: string | undefined;
 
-		if (this.authTokenService.status === AuthTokenStatus.Inactive && this.configurationService.getValue<boolean>('configurationSync.enable')) {
+		if (this.authTokenService.status === AuthTokenStatus.Inactive && this.userDataSyncService.status !== SyncStatus.Uninitialized && this.configurationService.getValue<boolean>('configurationSync.enable')) {
 			badge = new NumberBadge(1, () => localize('sign in', "Sign in..."));
 		} else if (this.userDataSyncService.status === SyncStatus.HasConflicts) {
 			badge = new NumberBadge(1, () => localize('resolve conflicts', "Resolve Conflicts"));
@@ -138,14 +136,11 @@ export class UserDataSyncWorkbenchContribution extends Disposable implements IWo
 	}
 
 	private async signIn(): Promise<void> {
-		const token = await this.quickInputService.input({ placeHolder: localize('enter token', "Please provide the auth bearer token"), ignoreFocusLost: true, });
-		if (token) {
-			await this.authTokenService.updateToken(token);
-		}
+		return this.authTokenService.login();
 	}
 
 	private async signOut(): Promise<void> {
-		await this.authTokenService.deleteToken();
+		await this.authTokenService.logout();
 	}
 
 	private async continueSync(): Promise<void> {
@@ -205,13 +200,14 @@ export class UserDataSyncWorkbenchContribution extends Disposable implements IWo
 				id: 'workbench.userData.actions.login',
 				title: localize('sign in', "Sign in...")
 			},
-			when: ContextKeyExpr.and(CONTEXT_AUTH_TOKEN_STATE.isEqualTo(AuthTokenStatus.Inactive), ContextKeyExpr.has('config.configurationSync.enable')),
+			when: ContextKeyExpr.and(CONTEXT_SYNC_STATE.notEqualsTo(SyncStatus.Uninitialized), CONTEXT_AUTH_TOKEN_STATE.isEqualTo(AuthTokenStatus.Inactive), ContextKeyExpr.has('config.configurationSync.enable')),
 		};
 		CommandsRegistry.registerCommand(signInMenuItem.command.id, () => this.signIn());
 		MenuRegistry.appendMenuItem(MenuId.GlobalActivity, signInMenuItem);
 		MenuRegistry.appendMenuItem(MenuId.CommandPalette, signInMenuItem);
 
 		const signOutMenuItem: IMenuItem = {
+			group: '5_sync',
 			command: {
 				id: 'workbench.userData.actions.logout',
 				title: localize('sign out', "Sign Out")
@@ -219,6 +215,7 @@ export class UserDataSyncWorkbenchContribution extends Disposable implements IWo
 			when: ContextKeyExpr.and(CONTEXT_AUTH_TOKEN_STATE.isEqualTo(AuthTokenStatus.Active)),
 		};
 		CommandsRegistry.registerCommand(signOutMenuItem.command.id, () => this.signOut());
+		MenuRegistry.appendMenuItem(MenuId.GlobalActivity, signOutMenuItem);
 		MenuRegistry.appendMenuItem(MenuId.CommandPalette, signOutMenuItem);
 
 		const startSyncMenuItem: IMenuItem = {
