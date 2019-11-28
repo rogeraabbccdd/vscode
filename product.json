@@ -21,7 +21,8 @@
 	"reportIssueUrl": "https://github.com/Microsoft/vscode/issues/new",
 	"urlProtocol": "code",
 	"extensionAllowedProposedApi": [
-		"ms-vscode.references-view"
+		"ms-vscode.references-view",
+		"ms-vsliveshare.vsliveshare"
 	],
 	"extensionsGallery": {
 		"serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
