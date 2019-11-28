@@ -507,7 +507,8 @@ export class TitlebarPart extends Part implements ITitleService {
 				// To benefit from LCD font rendering, we must ensure that we always set an
 				// opaque background color. As such, we compute an opaque color given we know
 				// the background color is the workbench background.
-				return color.isOpaque() ? color : color.makeOpaque(WORKBENCH_BACKGROUND(theme));
+				const workbenchBackground = theme.getColor(WORKBENCH_BACKGROUND);
+				return color.isOpaque() ? color : (workbenchBackground !== undefined) ? color.makeOpaque(workbenchBackground) : color.makeOpaque(color);
 			}) || '';
 			this.element.style.backgroundColor = titleBackground;
 			if (titleBackground && Color.fromHex(titleBackground).isLighter()) {
