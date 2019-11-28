@@ -29,7 +29,7 @@ import { dirname, basename } from 'vs/base/common/resources';
 import { LIGHT, FileThemeIcon, FolderThemeIcon, registerThemingParticipant } from 'vs/platform/theme/common/themeService';
 import { FileKind } from 'vs/platform/files/common/files';
 import { WorkbenchAsyncDataTree, TreeResourceNavigator2 } from 'vs/platform/list/browser/listService';
-import { ViewletPanel, IViewletPanelOptions } from 'vs/workbench/browser/parts/views/panelViewlet';
+import { ViewletPane, IViewletPaneOptions } from 'vs/workbench/browser/parts/views/paneViewlet';
 import { localize } from 'vs/nls';
 import { timeout } from 'vs/base/common/async';
 import { textLinkForeground, textCodeBlockBackground, focusBorder, listFilterMatchHighlight, listFilterMatchHighlightBorder } from 'vs/platform/theme/common/colorRegistry';
@@ -40,9 +40,10 @@ import { IListVirtualDelegate, IIdentityProvider } from 'vs/base/browser/ui/list
 import { ITreeRenderer, ITreeNode, IAsyncDataSource, ITreeContextMenuEvent } from 'vs/base/browser/ui/tree/tree';
 import { FuzzyScore, createMatches } from 'vs/base/common/filters';
 import { CollapseAllAction } from 'vs/base/browser/ui/tree/treeDefaults';
-import { isFalsyOrWhitespace } from 'vs/base/common/strings';
+import { escape, isFalsyOrWhitespace } from 'vs/base/common/strings';
+import { SIDE_BAR_BACKGROUND } from 'vs/workbench/common/theme';
 
-export class CustomTreeViewPanel extends ViewletPanel {
+export class CustomTreeViewPane extends ViewletPane {
 
 	private treeView: ITreeView;
 
@@ -54,7 +55,7 @@ export class CustomTreeViewPanel extends ViewletPanel {
 		@IConfigurationService configurationService: IConfigurationService,
 		@IContextKeyService contextKeyService: IContextKeyService,
 	) {
-		super({ ...(options as IViewletPanelOptions), ariaHeaderLabel: options.title }, keybindingService, contextMenuService, configurationService, contextKeyService);
+		super({ ...(options as IViewletPaneOptions), ariaHeaderLabel: options.title }, keybindingService, contextMenuService, configurationService, contextKeyService);
 		const { treeView } = (<ITreeViewDescriptor>Registry.as<IViewsRegistry>(Extensions.ViewsRegistry).getView(options.id));
 		this.treeView = treeView;
 		this._register(this.treeView.onDidChangeActions(() => this.updateActions(), this));
@@ -403,6 +404,9 @@ export class CustomTreeView extends Disposable implements ITreeView {
 				return e.collapsibleState !== TreeItemCollapsibleState.Expanded;
 			},
 			multipleSelectionSupport: this.canSelectMany,
+			overrideStyles: {
+				listBackground: SIDE_BAR_BACKGROUND
+			}
 		}) as WorkbenchAsyncDataTree<ITreeItem, ITreeItem, FuzzyScore>);
 		aligner.tree = this.tree;
 		const actionRunner = new MultipleSelectionActionRunner(this.notificationService, () => this.tree!.getSelection());
@@ -792,9 +796,26 @@ class TreeRenderer extends Disposable implements ITreeRenderer<ITreeItem, FuzzyS
 			templateData.resourceLabel.setResource({ name: label, description }, { title, hideIcon: true, extraClasses: ['custom-view-tree-node-item-resourceLabel'], matches: matches ? matches : createMatches(element.filterData) });
 		}
 
-		templateData.icon.style.backgroundImage = iconUrl ? DOM.asCSSUrl(iconUrl) : '';
 		templateData.icon.title = title ? title : '';
 		DOM.toggleClass(templateData.icon, 'custom-view-tree-node-item-icon', !!iconUrl);
+
+		let codicon: string | undefined;
+		if (iconUrl?.scheme === 'vscode-icon' && iconUrl?.authority === 'codicon') {
+			codicon = `codicon-${escape(iconUrl.path.substr(1))}`;
+		}
+
+		DOM.toggleClass(templateData.icon, 'codicon', !!codicon);
+		templateData.icon.classList.forEach((cls, i, list) => {
+			if (cls !== codicon && cls.indexOf('codicon-') === 0) {
+				list.remove(cls);
+			}
+		});
+		if (codicon) {
+			DOM.addClass(templateData.icon, codicon);
+		}
+
+		templateData.icon.style.backgroundImage = iconUrl && !codicon ? DOM.asCSSUrl(iconUrl) : '';
+
 		templateData.actionBar.context = <TreeViewItemHandleArg>{ $treeViewId: this.treeViewId, $treeItemHandle: node.handle };
 		templateData.actionBar.push(this.menus.getResourceActions(node), { icon: true, label: false });
 		if (this._actionRunner) {

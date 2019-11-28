@@ -140,14 +140,14 @@ export class OutlineNavigation implements IEditorContribution {
 		const ids = this._editor.deltaDecorations([], [{
 			range: element.symbol.selectionRange,
 			options: {
-				className: 'rangeHighlight',
+				className: 'symbolHighlight',
 			}
 		}]);
 		setTimeout(() => {
 			if (modelNow === this._editor.getModel()) {
 				this._editor.deltaDecorations(ids, []);
 			}
-		}, 250);
+		}, 350);
 	}
 }
 
@@ -164,7 +164,7 @@ registerEditorAction(class extends EditorAction {
 			kbOpts: {
 				weight: KeybindingWeight.EditorContrib,
 				kbExpr: EditorContextKeys.focus,
-				primary: KeyMod.Shift | KeyMod.Alt | KeyCode.DownArrow,
+				primary: undefined,
 				mac: {
 					primary: KeyMod.WinCtrl | KeyMod.Shift | KeyCode.DownArrow,
 				},
@@ -188,7 +188,7 @@ registerEditorAction(class extends EditorAction {
 			kbOpts: {
 				weight: KeybindingWeight.EditorContrib,
 				kbExpr: EditorContextKeys.focus,
-				primary: KeyMod.Shift | KeyMod.Alt | KeyCode.UpArrow,
+				primary: undefined,
 				mac: {
 					primary: KeyMod.WinCtrl | KeyMod.Shift | KeyCode.UpArrow,
 				},

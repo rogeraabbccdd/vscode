@@ -28,7 +28,7 @@ import { withNullAsUndefined } from 'vs/base/common/types';
 
 export interface IResourceLabelProps {
 	resource?: URI;
-	name?: string;
+	name?: string | string[];
 	description?: string;
 }
 
@@ -41,6 +41,7 @@ export interface IResourceLabelOptions extends IIconLabelValueOptions {
 export interface IFileLabelOptions extends IResourceLabelOptions {
 	hideLabel?: boolean;
 	hidePath?: boolean;
+	readonly parentCount?: number;
 }
 
 export interface IResourceLabel extends IDisposable {
@@ -367,7 +368,7 @@ class ResourceLabelWidget extends IconLabel {
 	setEditor(editor: IEditorInput, options?: IResourceLabelOptions): void {
 		this.setResource({
 			resource: toResource(editor, { supportSideBySide: SideBySideEditor.MASTER }),
-			name: withNullAsUndefined(editor.getName()),
+			name: editor.getName(),
 			description: editor.getDescription(options ? options.descriptionVerbosity : undefined)
 		}, options);
 	}
@@ -442,7 +443,8 @@ class ResourceLabelWidget extends IconLabel {
 			title: '',
 			italic: this.options && this.options.italic,
 			matches: this.options && this.options.matches,
-			extraClasses: []
+			extraClasses: [],
+			separator: this.options?.separator
 		};
 
 		const resource = this.label.resource;

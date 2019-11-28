@@ -15,6 +15,7 @@ import { cloneAndChange } from 'vs/base/common/objects';
 import { escape } from 'vs/base/common/strings';
 import { URI } from 'vs/base/common/uri';
 import { Schemas } from 'vs/base/common/network';
+import { renderCodicons } from 'vs/base/browser/ui/codiconLabel/codiconLabel';
 
 export interface MarkdownRenderOptions extends FormattedTextRenderOptions {
 	codeBlockRenderer?: (modeId: string, value: string) => Promise<string>;
@@ -50,19 +51,19 @@ export function renderMarkdown(markdown: IMarkdownString, options: MarkdownRende
 	const _href = function (href: string, isDomUri: boolean): string {
 		const data = markdown.uris && markdown.uris[href];
 		if (!data) {
-			return href;
+			return href; // no uri exists
 		}
 		let uri = URI.revive(data);
+		if (URI.parse(href).toString() === uri.toString()) {
+			return href; // no tranformation performed
+		}
 		if (isDomUri) {
 			uri = DOM.asDomUri(uri);
 		}
 		if (uri.query) {
 			uri = uri.with({ query: _uriMassage(uri.query) });
 		}
-		if (data) {
-			href = uri.toString(true);
-		}
-		return href;
+		return uri.toString();
 	};
 
 	// signal to code-block render that the
@@ -72,6 +73,10 @@ export function renderMarkdown(markdown: IMarkdownString, options: MarkdownRende
 
 	const renderer = new marked.Renderer();
 	renderer.image = (href: string, title: string, text: string) => {
+		if (href && href.indexOf('vscode-icon://codicon/') === 0) {
+			return renderCodicons(`$(${URI.parse(href).path.substr(1)})`);
+		}
+
 		let dimensions: string[] = [];
 		let attributes: string[] = [];
 		if (href) {
@@ -185,7 +190,8 @@ export function renderMarkdown(markdown: IMarkdownString, options: MarkdownRende
 			'a': ['href', 'name', 'target', 'data-href'],
 			'iframe': ['allowfullscreen', 'frameborder', 'src'],
 			'img': ['src', 'title', 'alt', 'width', 'height'],
-			'div': ['class', 'data-code']
+			'div': ['class', 'data-code'],
+			'span': ['class']
 		}
 	});
 

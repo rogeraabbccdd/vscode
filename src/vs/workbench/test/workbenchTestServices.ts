@@ -11,7 +11,7 @@ import * as resources from 'vs/base/common/resources';
 import { URI, UriComponents } from 'vs/base/common/uri';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
-import { ConfirmResult, IEditorInputWithOptions, CloseDirection, IEditorIdentifier, IUntitledTextResourceInput, IResourceDiffInput, IResourceSideBySideInput, IEditorInput, IEditor, IEditorCloseEvent, IEditorPartOptions } from 'vs/workbench/common/editor';
+import { IEditorInputWithOptions, CloseDirection, IEditorIdentifier, IUntitledTextResourceInput, IResourceDiffInput, IResourceSideBySideInput, IEditorInput, IEditor, IEditorCloseEvent, IEditorPartOptions, IRevertOptions } from 'vs/workbench/common/editor';
 import { IEditorOpeningEvent, EditorServiceImpl, IEditorGroupView } from 'vs/workbench/browser/parts/editor/editor';
 import { Event, Emitter } from 'vs/base/common/event';
 import Severity from 'vs/base/common/severity';
@@ -49,7 +49,7 @@ import { IContextKeyService } from 'vs/platform/contextkey/common/contextkey';
 import { MockContextKeyService, MockKeybindingService } from 'vs/platform/keybinding/test/common/mockKeybindingService';
 import { ITextBufferFactory, DefaultEndOfLine, EndOfLinePreference, IModelDecorationOptions, ITextModel, ITextSnapshot } from 'vs/editor/common/model';
 import { Range } from 'vs/editor/common/core/range';
-import { IConfirmation, IConfirmationResult, IDialogService, IDialogOptions, IPickAndOpenOptions, ISaveDialogOptions, IOpenDialogOptions, IFileDialogService, IShowResult } from 'vs/platform/dialogs/common/dialogs';
+import { IConfirmation, IConfirmationResult, IDialogService, IDialogOptions, IPickAndOpenOptions, ISaveDialogOptions, IOpenDialogOptions, IFileDialogService, IShowResult, ConfirmResult } from 'vs/platform/dialogs/common/dialogs';
 import { INotificationService } from 'vs/platform/notification/common/notification';
 import { TestNotificationService } from 'vs/platform/notification/test/common/testNotificationService';
 import { IExtensionService, NullExtensionService } from 'vs/workbench/services/extensions/common/extensions';
@@ -57,7 +57,7 @@ import { IKeybindingService } from 'vs/platform/keybinding/common/keybinding';
 import { IDecorationsService, IResourceDecorationChangeEvent, IDecoration, IDecorationData, IDecorationsProvider } from 'vs/workbench/services/decorations/browser/decorations';
 import { IDisposable, toDisposable, Disposable } from 'vs/base/common/lifecycle';
 import { IEditorGroupsService, IEditorGroup, GroupsOrder, GroupsArrangement, GroupDirection, IAddGroupOptions, IMergeGroupOptions, IMoveEditorOptions, ICopyEditorOptions, IEditorReplacement, IGroupChangeEvent, EditorsOrder, IFindGroupScope, EditorGroupLayout, ICloseEditorOptions } from 'vs/workbench/services/editor/common/editorGroupsService';
-import { IEditorService, IOpenEditorOverrideHandler, IVisibleEditor } from 'vs/workbench/services/editor/common/editorService';
+import { IEditorService, IOpenEditorOverrideHandler, IVisibleEditor, ISaveEditorsOptions, IRevertAllEditorsOptions } from 'vs/workbench/services/editor/common/editorService';
 import { ICodeEditorService } from 'vs/editor/browser/services/codeEditorService';
 import { ICodeEditor, IDiffEditor } from 'vs/editor/browser/editorBrowser';
 import { IDecorationRenderOptions } from 'vs/editor/common/editorCommon';
@@ -192,7 +192,6 @@ export class TestTextFileService extends NativeTextFileService {
 	public cleanupBackupsBeforeShutdownCalled!: boolean;
 
 	private promptPath!: URI;
-	private confirmResult!: ConfirmResult;
 	private resolveTextContentError!: FileOperationError | null;
 
 	constructor(
@@ -241,10 +240,6 @@ export class TestTextFileService extends NativeTextFileService {
 		this.promptPath = path;
 	}
 
-	public setConfirmResult(result: ConfirmResult): void {
-		this.confirmResult = result;
-	}
-
 	public setResolveTextContentErrorOnce(error: FileOperationError): void {
 		this.resolveTextContentError = error;
 	}
@@ -275,14 +270,6 @@ export class TestTextFileService extends NativeTextFileService {
 		return Promise.resolve(this.promptPath);
 	}
 
-	public confirmSave(_resources?: URI[]): Promise<ConfirmResult> {
-		return Promise.resolve(this.confirmResult);
-	}
-
-	public confirmOverwrite(_resource: URI): Promise<boolean> {
-		return Promise.resolve(true);
-	}
-
 	protected cleanupBackupsBeforeShutdown(): Promise<void> {
 		this.cleanupBackupsBeforeShutdownCalled = true;
 		return Promise.resolve();
@@ -303,6 +290,8 @@ export function workbenchInstantiationService(): IInstantiationService {
 	instantiationService.stub(IUntitledTextEditorService, instantiationService.createInstance(UntitledTextEditorService));
 	instantiationService.stub(IStorageService, new TestStorageService());
 	instantiationService.stub(IWorkbenchLayoutService, new TestLayoutService());
+	instantiationService.stub(IDialogService, new TestDialogService());
+	instantiationService.stub(IFileDialogService, new TestFileDialogService());
 	instantiationService.stub(IElectronService, new TestElectronService());
 	instantiationService.stub(IModeService, instantiationService.createInstance(ModeServiceImpl));
 	instantiationService.stub(IHistoryService, new TestHistoryService());
@@ -420,6 +409,8 @@ export class TestFileDialogService implements IFileDialogService {
 
 	public _serviceBrand: undefined;
 
+	private confirmResult!: ConfirmResult;
+
 	public defaultFilePath(_schemeFilter?: string): URI | undefined {
 		return undefined;
 	}
@@ -450,6 +441,12 @@ export class TestFileDialogService implements IFileDialogService {
 	public showOpenDialog(_options: IOpenDialogOptions): Promise<URI[] | undefined> {
 		return Promise.resolve(undefined);
 	}
+	public setConfirmResult(result: ConfirmResult): void {
+		this.confirmResult = result;
+	}
+	public showSaveConfirm(fileNamesOrResources: (string | URI)[]): Promise<ConfirmResult> {
+		return Promise.resolve(this.confirmResult);
+	}
 }
 
 export class TestLayoutService implements IWorkbenchLayoutService {
@@ -463,6 +460,7 @@ export class TestLayoutService implements IWorkbenchLayoutService {
 	onZenModeChange: Event<boolean> = Event.None;
 	onCenteredLayoutChange: Event<boolean> = Event.None;
 	onFullscreenChange: Event<boolean> = Event.None;
+	onMaximizeChange: Event<boolean> = Event.None;
 	onPanelPositionChange: Event<string> = Event.None;
 	onPartVisibilityChange: Event<void> = Event.None;
 	onLayout = Event.None;
@@ -572,6 +570,12 @@ export class TestLayoutService implements IWorkbenchLayoutService {
 	public resizePart(_part: Parts, _sizeChange: number): void { }
 
 	public registerPart(part: Part): void { }
+
+	isWindowMaximized() {
+		return false;
+	}
+
+	public updateWindowMaximizedState(maximized: boolean): void { }
 }
 
 let activeViewlet: Viewlet = {} as any;
@@ -805,7 +809,7 @@ export class TestEditorGroup implements IEditorGroupView {
 		return [];
 	}
 
-	getEditor(_index: number): IEditorInput {
+	getEditorByIndex(_index: number): IEditorInput {
 		throw new Error('not implemented');
 	}
 
@@ -916,6 +920,22 @@ export class TestEditorService implements EditorServiceImpl {
 
 	createInput(_input: IResourceInput | IUntitledTextResourceInput | IResourceDiffInput | IResourceSideBySideInput): IEditorInput {
 		throw new Error('not implemented');
+	}
+
+	save(editors: IEditorIdentifier[], options?: ISaveEditorsOptions): Promise<boolean> {
+		throw new Error('Method not implemented.');
+	}
+
+	saveAll(options?: ISaveEditorsOptions): Promise<boolean> {
+		throw new Error('Method not implemented.');
+	}
+
+	revert(editors: IEditorIdentifier[], options?: IRevertOptions): Promise<boolean> {
+		throw new Error('Method not implemented.');
+	}
+
+	revertAll(options?: IRevertAllEditorsOptions): Promise<boolean> {
+		throw new Error('Method not implemented.');
 	}
 }
 
@@ -1371,7 +1391,7 @@ export class TestElectronService implements IElectronService {
 	async setRepresentedFilename(path: string): Promise<void> { }
 	async setDocumentEdited(edited: boolean): Promise<void> { }
 	async openExternal(url: string): Promise<boolean> { return false; }
-	async updateTouchBar(items: { id: string; title: string | { value: string; original: string; }; category?: string | { value: string; original: string; } | undefined; iconLocation?: { dark: UriComponents; light?: { readonly scheme: string; readonly authority: string; readonly path: string; readonly query: string; readonly fragment: string; readonly fsPath: string; with: {}; toString: {}; toJSON: {}; } | undefined; } | undefined; precondition?: { getType: {}; equals: {}; evaluate: {}; serialize: {}; keys: {}; map: {}; negate: {}; } | undefined; toggled?: { getType: {}; equals: {}; evaluate: {}; serialize: {}; keys: {}; map: {}; negate: {}; } | undefined; }[][]): Promise<void> { }
+	async updateTouchBar(items: { id: string; title: string | { value: string; original: string; }; category?: string | { value: string; original: string; } | undefined; iconLocation?: { dark?: UriComponents; light?: { readonly scheme: string; readonly authority: string; readonly path: string; readonly query: string; readonly fragment: string; readonly fsPath: string; with: {}; toString: {}; toJSON: {}; } | undefined; } | undefined; precondition?: { getType: {}; equals: {}; evaluate: {}; serialize: {}; keys: {}; map: {}; negate: {}; } | undefined; toggled?: { getType: {}; equals: {}; evaluate: {}; serialize: {}; keys: {}; map: {}; negate: {}; } | undefined; }[][]): Promise<void> { }
 	async newWindowTab(): Promise<void> { }
 	async showPreviousWindowTab(): Promise<void> { }
 	async showNextWindowTab(): Promise<void> { }

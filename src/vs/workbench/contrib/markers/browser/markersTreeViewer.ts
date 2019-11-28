@@ -314,6 +314,7 @@ class MarkerWidget extends Disposable {
 		const lineMatches = filterData && filterData.lineMatches || [];
 
 		let lastLineElement: HTMLElement | undefined = undefined;
+		this.messageAndDetailsContainer.title = element.marker.message;
 		for (let index = 0; index < (multiline ? lines.length : 1); index++) {
 			lastLineElement = dom.append(this.messageAndDetailsContainer, dom.$('.marker-message-line'));
 			const messageElement = dom.append(lastLineElement, dom.$('.marker-message'));
@@ -563,7 +564,7 @@ export class MarkerViewModel extends Disposable {
 	}
 
 	private toActions(codeActions: CodeActionSet): IAction[] {
-		return codeActions.actions.map(codeAction => new Action(
+		return codeActions.validActions.map(codeAction => new Action(
 			codeAction.command ? codeAction.command.id : codeAction.title,
 			codeAction.title,
 			undefined,
