@@ -380,6 +380,7 @@ declare namespace monaco {
 	export interface IMarkdownString {
 		readonly value: string;
 		readonly isTrusted?: boolean;
+		readonly supportThemeIcons?: boolean;
 		uris?: {
 			[href: string]: UriComponents;
 		};
@@ -2418,15 +2419,6 @@ declare namespace monaco.editor {
 		readonly reason: CursorChangeReason;
 	}
 
-	export enum AccessibilitySupport {
-		/**
-		 * This should be the browser case where it is not known if a screen reader is attached or no.
-		 */
-		Unknown = 0,
-		Disabled = 1,
-		Enabled = 2
-	}
-
 	/**
 	 * Configuration options for auto closing quotes and brackets
 	 */
@@ -2731,6 +2723,10 @@ declare namespace monaco.editor {
 		 */
 		accessibilitySupport?: 'auto' | 'off' | 'on';
 		/**
+		 * Controls the number of lines in the editor that can be read out by a screen reader
+		 */
+		accessibilityPageSize?: number;
+		/**
 		 * Suggest options.
 		 */
 		suggest?: ISuggestOptions;
@@ -2876,9 +2872,9 @@ declare namespace monaco.editor {
 		showFoldingControls?: 'always' | 'mouseover';
 		/**
 		 * Enable highlighting of matching brackets.
-		 * Defaults to true.
+		 * Defaults to 'always'.
 		 */
-		matchBrackets?: boolean;
+		matchBrackets?: 'never' | 'near' | 'always';
 		/**
 		 * Enable rendering of whitespace.
 		 * Defaults to none.
@@ -2984,66 +2980,6 @@ declare namespace monaco.editor {
 	}
 
 	/**
-	 * The kind of animation in which the editor's cursor should be rendered.
-	 */
-	export enum TextEditorCursorBlinkingStyle {
-		/**
-		 * Hidden
-		 */
-		Hidden = 0,
-		/**
-		 * Blinking
-		 */
-		Blink = 1,
-		/**
-		 * Blinking with smooth fading
-		 */
-		Smooth = 2,
-		/**
-		 * Blinking with prolonged filled state and smooth fading
-		 */
-		Phase = 3,
-		/**
-		 * Expand collapse animation on the y axis
-		 */
-		Expand = 4,
-		/**
-		 * No-Blinking
-		 */
-		Solid = 5
-	}
-
-	/**
-	 * The style in which the editor's cursor should be rendered.
-	 */
-	export enum TextEditorCursorStyle {
-		/**
-		 * As a vertical line (sitting between two characters).
-		 */
-		Line = 1,
-		/**
-		 * As a block (sitting on top of a character).
-		 */
-		Block = 2,
-		/**
-		 * As a horizontal line (sitting under a character).
-		 */
-		Underline = 3,
-		/**
-		 * As a thin vertical line (sitting between two characters).
-		 */
-		LineThin = 4,
-		/**
-		 * As an outlined block (sitting on top of a character).
-		 */
-		BlockOutline = 5,
-		/**
-		 * As a thin horizontal line (sitting under a character).
-		 */
-		UnderlineThin = 6
-	}
-
-	/**
 	 * Configuration options for editor find widget
 	 */
 	export interface IEditorFindOptions {
@@ -3057,8 +2993,6 @@ declare namespace monaco.editor {
 		autoFindInSelection?: 'never' | 'always' | 'multiline';
 		addExtraSpaceOnTop?: boolean;
 	}
-
-	export type EditorFindOptions = Readonly<Required<IEditorFindOptions>>;
 
 	export type GoToLocationValues = 'peek' | 'gotoAndPeek' | 'goto';
 
@@ -3078,8 +3012,6 @@ declare namespace monaco.editor {
 		alternativeImplementationCommand?: string;
 		alternativeReferenceCommand?: string;
 	}
-
-	export type GoToLocationOptions = Readonly<Required<IGotoLocationOptions>>;
 
 	/**
 	 * Configuration options for editor hover
@@ -3101,8 +3033,6 @@ declare namespace monaco.editor {
 		 */
 		sticky?: boolean;
 	}
-
-	export type EditorHoverOptions = Readonly<Required<IEditorHoverOptions>>;
 
 	/**
 	 * A description for the overview ruler position.
@@ -3233,8 +3163,6 @@ declare namespace monaco.editor {
 		enabled?: boolean;
 	}
 
-	export type EditorLightbulbOptions = Readonly<Required<IEditorLightbulbOptions>>;
-
 	/**
 	 * Configuration options for editor minimap
 	 */
@@ -3270,8 +3198,6 @@ declare namespace monaco.editor {
 		scale?: number;
 	}
 
-	export type EditorMinimapOptions = Readonly<Required<IEditorMinimapOptions>>;
-
 	/**
 	 * Configuration options for parameter hints
 	 */
@@ -3288,8 +3214,6 @@ declare namespace monaco.editor {
 		cycle?: boolean;
 	}
 
-	export type InternalParameterHintOptions = Readonly<Required<IEditorParameterHintOptions>>;
-
 	/**
 	 * Configuration options for quick suggestions
 	 */
@@ -3299,22 +3223,7 @@ declare namespace monaco.editor {
 		strings: boolean;
 	}
 
-	export type ValidQuickSuggestionsOptions = boolean | Readonly<Required<IQuickSuggestionsOptions>>;
-
 	export type LineNumbersType = 'on' | 'off' | 'relative' | 'interval' | ((lineNumber: number) => string);
-
-	export enum RenderLineNumbersType {
-		Off = 0,
-		On = 1,
-		Relative = 2,
-		Interval = 3,
-		Custom = 4
-	}
-
-	export interface InternalEditorRenderLineNumbersOptions {
-		readonly renderType: RenderLineNumbersType;
-		readonly renderFn: ((lineNumber: number) => string) | null;
-	}
 
 	/**
 	 * Configuration options for editor scrollbars
@@ -3356,6 +3265,11 @@ declare namespace monaco.editor {
 		 */
 		handleMouseWheel?: boolean;
 		/**
+		 * Always consume mouse wheel events (always call preventDefault() and stopPropagation() on the browser events).
+		 * Defaults to true.
+		 */
+		alwaysConsumeMouseWheel?: boolean;
+		/**
 		 * Height in pixels for the horizontal scrollbar.
 		 * Defaults to 10 (px).
 		 */
@@ -3375,20 +3289,6 @@ declare namespace monaco.editor {
 		 * Defaults to `horizontalScrollbarSize`.
 		 */
 		horizontalSliderSize?: number;
-	}
-
-	export interface InternalEditorScrollbarOptions {
-		readonly arrowSize: number;
-		readonly vertical: ScrollbarVisibility;
-		readonly horizontal: ScrollbarVisibility;
-		readonly useShadows: boolean;
-		readonly verticalHasArrows: boolean;
-		readonly horizontalHasArrows: boolean;
-		readonly handleMouseWheel: boolean;
-		readonly horizontalScrollbarSize: number;
-		readonly horizontalSliderSize: number;
-		readonly verticalScrollbarSize: number;
-		readonly verticalSliderSize: number;
 	}
 
 	/**
@@ -3527,37 +3427,6 @@ declare namespace monaco.editor {
 		 * Show snippet-suggestions.
 		 */
 		showSnippets?: boolean;
-	}
-
-	export type InternalSuggestOptions = Readonly<Required<ISuggestOptions>>;
-
-	/**
-	 * Describes how to indent wrapped lines.
-	 */
-	export enum WrappingIndent {
-		/**
-		 * No indentation => wrapped lines begin at column 1.
-		 */
-		None = 0,
-		/**
-		 * Same => wrapped lines get the same indentation as the parent.
-		 */
-		Same = 1,
-		/**
-		 * Indent => wrapped lines get +1 indentation toward the parent.
-		 */
-		Indent = 2,
-		/**
-		 * DeepIndent => wrapped lines get +2 indentation toward the parent.
-		 */
-		DeepIndent = 3
-	}
-
-	export interface EditorWrappingInfo {
-		readonly isDominatedByLongLines: boolean;
-		readonly isWordWrapMinified: boolean;
-		readonly isViewportWrapping: boolean;
-		readonly wrappingColumn: number;
 	}
 
 	/**
@@ -4514,7 +4383,7 @@ declare namespace monaco.languages {
 		/**
 		 * Provide commands for the given document and range.
 		 */
-		provideCodeActions(model: editor.ITextModel, range: Range, context: CodeActionContext, token: CancellationToken): CodeActionList | Promise<CodeActionList>;
+		provideCodeActions(model: editor.ITextModel, range: Range, context: CodeActionContext, token: CancellationToken): ProviderResult<CodeActionList>;
 	}
 
 	/**
@@ -5513,9 +5382,9 @@ declare namespace monaco.languages {
 	}
 
 	export interface ResourceFileEdit {
-		oldUri: Uri;
-		newUri: Uri;
-		options: {
+		oldUri?: Uri;
+		newUri?: Uri;
+		options?: {
 			overwrite?: boolean;
 			ignoreIfNotExists?: boolean;
 			ignoreIfExists?: boolean;
@@ -5571,30 +5440,31 @@ declare namespace monaco.languages {
 		resolveCodeLens?(model: editor.ITextModel, codeLens: CodeLens, token: CancellationToken): ProviderResult<CodeLens>;
 	}
 
-	export interface SemanticColoringLegend {
+	export interface SemanticTokensLegend {
 		readonly tokenTypes: string[];
 		readonly tokenModifiers: string[];
 	}
 
-	export interface SemanticColoringArea {
-		/**
-		 * The zero-based line value where this token block begins.
-		 */
-		readonly line: number;
-		/**
-		 * The actual token block encoded data.
-		 */
+	export interface SemanticTokens {
+		readonly resultId?: string;
 		readonly data: Uint32Array;
 	}
 
-	export interface SemanticColoring {
-		readonly areas: SemanticColoringArea[];
-		dispose(): void;
+	export interface SemanticTokensEdit {
+		readonly start: number;
+		readonly deleteCount: number;
+		readonly data?: Uint32Array;
 	}
 
-	export interface SemanticColoringProvider {
-		getLegend(): SemanticColoringLegend;
-		provideSemanticColoring(model: editor.ITextModel, token: CancellationToken): ProviderResult<SemanticColoring>;
+	export interface SemanticTokensEdits {
+		readonly resultId?: string;
+		readonly edits: SemanticTokensEdit[];
+	}
+
+	export interface SemanticTokensProvider {
+		getLegend(): SemanticTokensLegend;
+		provideSemanticTokens(model: editor.ITextModel, lastResultId: string | null, ranges: Range[] | null, token: CancellationToken): ProviderResult<SemanticTokens | SemanticTokensEdits>;
+		releaseSemanticTokens(resultId: string | undefined): void;
 	}
 
 	export interface ILanguageExtensionPoint {

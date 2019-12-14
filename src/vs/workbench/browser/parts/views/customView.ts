@@ -26,10 +26,10 @@ import { ResourceLabels, IResourceLabel } from 'vs/workbench/browser/labels';
 import { ActionBar, IActionViewItemProvider, ActionViewItem } from 'vs/base/browser/ui/actionbar/actionbar';
 import { URI } from 'vs/base/common/uri';
 import { dirname, basename } from 'vs/base/common/resources';
-import { LIGHT, FileThemeIcon, FolderThemeIcon, registerThemingParticipant } from 'vs/platform/theme/common/themeService';
+import { LIGHT, FileThemeIcon, FolderThemeIcon, registerThemingParticipant, ThemeIcon } from 'vs/platform/theme/common/themeService';
 import { FileKind } from 'vs/platform/files/common/files';
 import { WorkbenchAsyncDataTree, TreeResourceNavigator2 } from 'vs/platform/list/browser/listService';
-import { ViewletPane, IViewletPaneOptions } from 'vs/workbench/browser/parts/views/paneViewlet';
+import { ViewPane, IViewPaneOptions } from 'vs/workbench/browser/parts/views/viewPaneContainer';
 import { localize } from 'vs/nls';
 import { timeout } from 'vs/base/common/async';
 import { textLinkForeground, textCodeBlockBackground, focusBorder, listFilterMatchHighlight, listFilterMatchHighlightBorder } from 'vs/platform/theme/common/colorRegistry';
@@ -40,10 +40,10 @@ import { IListVirtualDelegate, IIdentityProvider } from 'vs/base/browser/ui/list
 import { ITreeRenderer, ITreeNode, IAsyncDataSource, ITreeContextMenuEvent } from 'vs/base/browser/ui/tree/tree';
 import { FuzzyScore, createMatches } from 'vs/base/common/filters';
 import { CollapseAllAction } from 'vs/base/browser/ui/tree/treeDefaults';
-import { escape, isFalsyOrWhitespace } from 'vs/base/common/strings';
+import { isFalsyOrWhitespace } from 'vs/base/common/strings';
 import { SIDE_BAR_BACKGROUND } from 'vs/workbench/common/theme';
 
-export class CustomTreeViewPane extends ViewletPane {
+export class CustomTreeViewPane extends ViewPane {
 
 	private treeView: ITreeView;
 
@@ -55,7 +55,7 @@ export class CustomTreeViewPane extends ViewletPane {
 		@IConfigurationService configurationService: IConfigurationService,
 		@IContextKeyService contextKeyService: IContextKeyService,
 	) {
-		super({ ...(options as IViewletPaneOptions), ariaHeaderLabel: options.title }, keybindingService, contextMenuService, configurationService, contextKeyService);
+		super({ ...(options as IViewPaneOptions), ariaHeaderLabel: options.title }, keybindingService, contextMenuService, configurationService, contextKeyService);
 		const { treeView } = (<ITreeViewDescriptor>Registry.as<IViewsRegistry>(Extensions.ViewsRegistry).getView(options.id));
 		this.treeView = treeView;
 		this._register(this.treeView.onDidChangeActions(() => this.updateActions(), this));
@@ -614,16 +614,7 @@ export class CustomTreeView extends Disposable implements ITreeView {
 		const tree = this.tree;
 		if (tree && this.visible) {
 			this.refreshing = true;
-			await Promise.all(elements.map(element => tree.updateChildren(element, true)));
-
-			elements.map(element => {
-				try {
-					tree.rerender(element);
-				} catch {
-					// noop
-				}
-			});
-
+			await Promise.all(elements.map(element => tree.updateChildren(element, true, true)));
 			this.refreshing = false;
 			this.updateContentAreas();
 			if (this.focused) {
@@ -789,7 +780,7 @@ class TreeRenderer extends Disposable implements ITreeRenderer<ITreeItem, FuzzyS
 		// reset
 		templateData.actionBar.clear();
 
-		if (resource || node.themeIcon) {
+		if (resource || this.isFileKindThemeIcon(node.themeIcon)) {
 			const fileDecorations = this.configurationService.getValue<{ colors: boolean, badges: boolean }>('explorer.decorations');
 			templateData.resourceLabel.setResource({ name: label, description, resource: resource ? resource : URI.parse('missing:_icon_resource') }, { fileKind: this.getFileKind(node), title, hideIcon: !!iconUrl, fileDecorations, extraClasses: ['custom-view-tree-node-item-resourceLabel'], matches: matches ? matches : createMatches(element.filterData) });
 		} else {
@@ -797,24 +788,18 @@ class TreeRenderer extends Disposable implements ITreeRenderer<ITreeItem, FuzzyS
 		}
 
 		templateData.icon.title = title ? title : '';
-		DOM.toggleClass(templateData.icon, 'custom-view-tree-node-item-icon', !!iconUrl);
 
-		let codicon: string | undefined;
-		if (iconUrl?.scheme === 'vscode-icon' && iconUrl?.authority === 'codicon') {
-			codicon = `codicon-${escape(iconUrl.path.substr(1))}`;
-		}
+		if (iconUrl) {
+			templateData.icon.className = 'custom-view-tree-node-item-icon';
+			templateData.icon.style.backgroundImage = DOM.asCSSUrl(iconUrl);
 
-		DOM.toggleClass(templateData.icon, 'codicon', !!codicon);
-		templateData.icon.classList.forEach((cls, i, list) => {
-			if (cls !== codicon && cls.indexOf('codicon-') === 0) {
-				list.remove(cls);
+		} else {
+			let iconClass: string | undefined;
+			if (node.themeIcon && !this.isFileKindThemeIcon(node.themeIcon)) {
+				iconClass = ThemeIcon.asClassName(node.themeIcon);
 			}
-		});
-		if (codicon) {
-			DOM.addClass(templateData.icon, codicon);
+			templateData.icon.className = iconClass ? `custom-view-tree-node-item-icon ${iconClass}` : '';
 		}
-
-		templateData.icon.style.backgroundImage = iconUrl && !codicon ? DOM.asCSSUrl(iconUrl) : '';
 
 		templateData.actionBar.context = <TreeViewItemHandleArg>{ $treeViewId: this.treeViewId, $treeItemHandle: node.handle };
 		templateData.actionBar.push(this.menus.getResourceActions(node), { icon: true, label: false });
@@ -827,6 +812,14 @@ class TreeRenderer extends Disposable implements ITreeRenderer<ITreeItem, FuzzyS
 
 	private setAlignment(container: HTMLElement, treeItem: ITreeItem) {
 		DOM.toggleClass(container.parentElement!, 'align-icon-with-twisty', this.aligner.alignIconWithTwisty(treeItem));
+	}
+
+	private isFileKindThemeIcon(icon: ThemeIcon | undefined): boolean {
+		if (icon) {
+			return icon.id === FileThemeIcon.id || icon.id === FolderThemeIcon.id;
+		} else {
+			return false;
+		}
 	}
 
 	private getFileKind(node: ITreeItem): FileKind {

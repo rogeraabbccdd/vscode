@@ -467,7 +467,10 @@ export abstract class AbstractSettingRenderer extends Disposable implements ITre
 		}
 
 		const onChange = (value: any) => this._onDidChangeSetting.fire({ key: element.setting.key, value, type: template.context!.valueType });
-		template.deprecationWarningElement.innerText = element.setting.deprecationMessage || '';
+		const deprecationText = element.setting.deprecationMessage || '';
+		template.deprecationWarningElement.innerText = deprecationText;
+		DOM.toggleClass(template.containerElement, 'is-deprecated', !!deprecationText);
+
 		this.renderValue(element, <ISettingItemTemplate>template, onChange);
 
 	}
@@ -956,6 +959,9 @@ export class SettingEnumRenderer extends AbstractSettingRenderer implements ITre
 		const enumDescriptions = dataElement.setting.enumDescriptions;
 		const enumDescriptionsAreMarkdown = dataElement.setting.enumDescriptionsAreMarkdown;
 
+		const disposables = new DisposableStore();
+		template.toDispose.push(disposables);
+
 		const displayOptions = dataElement.setting.enum!
 			.map(String)
 			.map(escapeInvisibleChars)
@@ -963,6 +969,12 @@ export class SettingEnumRenderer extends AbstractSettingRenderer implements ITre
 				text: data,
 				description: (enumDescriptions && enumDescriptions[index] && (enumDescriptionsAreMarkdown ? fixSettingLinks(enumDescriptions[index], false) : enumDescriptions[index])),
 				descriptionIsMarkdown: enumDescriptionsAreMarkdown,
+				descriptionMarkdownActionHandler: {
+					callback: (content) => {
+						this._openerService.open(content).catch(onUnexpectedError);
+					},
+					disposeables: disposables
+				},
 				decoratorRight: (data === dataElement.defaultValue ? localize('settings.Default', "{0}", 'default') : '')
 			});
 

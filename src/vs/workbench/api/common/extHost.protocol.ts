@@ -22,7 +22,7 @@ import { IModelChangedEvent } from 'vs/editor/common/model/mirrorTextModel';
 import * as modes from 'vs/editor/common/modes';
 import { CharacterPair, CommentRule, EnterAction } from 'vs/editor/common/modes/languageConfiguration';
 import { ICommandHandlerDescription } from 'vs/platform/commands/common/commands';
-import { ConfigurationTarget, IConfigurationData, IConfigurationModel } from 'vs/platform/configuration/common/configuration';
+import { ConfigurationTarget, IConfigurationData, IConfigurationChange } from 'vs/platform/configuration/common/configuration';
 import { ConfigurationScope } from 'vs/platform/configuration/common/configurationRegistry';
 import { ExtensionIdentifier, IExtensionDescription } from 'vs/platform/extensions/common/extensions';
 import * as files from 'vs/platform/files/common/files';
@@ -47,6 +47,7 @@ import { createExtHostContextProxyIdentifier as createExtId, createMainContextPr
 import * as search from 'vs/workbench/services/search/common/search';
 import { SaveReason } from 'vs/workbench/common/editor';
 import { ExtensionActivationReason } from 'vs/workbench/api/common/extHostExtensionActivator';
+import { TunnelOptions, TunnelDto } from 'vs/workbench/api/common/extHostTunnelService';
 
 export interface IEnvironment {
 	isExtensionDevelopmentDebug: boolean;
@@ -86,6 +87,7 @@ export interface IInitData {
 	telemetryInfo: ITelemetryInfo;
 	logLevel: LogLevel;
 	logsLocation: URI;
+	logFile: URI;
 	autoStart: boolean;
 	remote: { isRemote: boolean; authority: string | undefined; };
 	uiKind: UIKind;
@@ -93,11 +95,6 @@ export interface IInitData {
 
 export interface IConfigurationInitData extends IConfigurationData {
 	configurationScopes: [string, ConfigurationScope | undefined][];
-}
-
-export interface IWorkspaceConfigurationChangeEventData {
-	changedConfiguration: IConfigurationModel;
-	changedConfigurationByResource: { [folder: string]: IConfigurationModel; };
 }
 
 export interface IExtHostContext extends IRPCProtocol {
@@ -354,7 +351,7 @@ export interface MainThreadLanguageFeaturesShape extends IDisposable {
 	$registerOnTypeFormattingSupport(handle: number, selector: IDocumentFilterDto[], autoFormatTriggerCharacters: string[], extensionId: ExtensionIdentifier): void;
 	$registerNavigateTypeSupport(handle: number): void;
 	$registerRenameSupport(handle: number, selector: IDocumentFilterDto[], supportsResolveInitialValues: boolean): void;
-	$registerSemanticColoringProvider(handle: number, selector: IDocumentFilterDto[], legend: modes.SemanticColoringLegend): void;
+	$registerSemanticTokensProvider(handle: number, selector: IDocumentFilterDto[], legend: modes.SemanticTokensLegend): void;
 	$registerSuggestSupport(handle: number, selector: IDocumentFilterDto[], triggerCharacters: string[], supportsResolveDetails: boolean, extensionId: ExtensionIdentifier): void;
 	$registerSignatureHelpProvider(handle: number, selector: IDocumentFilterDto[], metadata: ISignatureHelpProviderMetadataDto): void;
 	$registerDocumentLinkProvider(handle: number, selector: IDocumentFilterDto[], supportsResolve: boolean): void;
@@ -556,6 +553,10 @@ export interface WebviewExtensionDescription {
 	readonly location: UriComponents;
 }
 
+export enum WebviewEditorCapabilities {
+	Editable,
+}
+
 export interface MainThreadWebviewsShape extends IDisposable {
 	$createWebviewPanel(extension: WebviewExtensionDescription, handle: WebviewPanelHandle, viewType: string, title: string, showOptions: WebviewPanelShowOptions, options: modes.IWebviewPanelOptions & modes.IWebviewOptions): void;
 	$disposeWebview(handle: WebviewPanelHandle): void;
@@ -573,6 +574,7 @@ export interface MainThreadWebviewsShape extends IDisposable {
 
 	$registerEditorProvider(extension: WebviewExtensionDescription, viewType: string, options: modes.IWebviewPanelOptions): void;
 	$unregisterEditorProvider(viewType: string): void;
+	$registerCapabilities(handle: WebviewPanelHandle, capabilities: readonly WebviewEditorCapabilities[]): void;
 
 	$onEdit(handle: WebviewPanelHandle, editJson: any): void;
 }
@@ -605,7 +607,6 @@ export interface MainThreadUrlsShape extends IDisposable {
 	$registerUriHandler(handle: number, extensionId: ExtensionIdentifier): Promise<void>;
 	$unregisterUriHandler(handle: number): Promise<void>;
 	$createAppUri(uri: UriComponents): Promise<UriComponents>;
-	$proposedCreateAppUri(extensionId: ExtensionIdentifier, options?: { payload?: Partial<UriComponents>; }): Promise<UriComponents>;
 }
 
 export interface ExtHostUrlsShape {
@@ -772,6 +773,12 @@ export interface MainThreadWindowShape extends IDisposable {
 	$asExternalUri(uri: UriComponents, options: IOpenUriOptions): Promise<UriComponents>;
 }
 
+export interface MainThreadTunnelServiceShape extends IDisposable {
+	$openTunnel(tunnelOptions: TunnelOptions): Promise<TunnelDto | undefined>;
+	$closeTunnel(remotePort: number): Promise<void>;
+	$registerCandidateFinder(): Promise<void>;
+}
+
 // -- extension host
 
 export interface ExtHostCommandsShape {
@@ -781,7 +788,7 @@ export interface ExtHostCommandsShape {
 
 export interface ExtHostConfigurationShape {
 	$initializeConfiguration(data: IConfigurationInitData): void;
-	$acceptConfigurationChanged(data: IConfigurationInitData, eventData: IWorkspaceConfigurationChangeEventData): void;
+	$acceptConfigurationChanged(data: IConfigurationInitData, change: IConfigurationChange): void;
 }
 
 export interface ExtHostDiagnosticsShape {
@@ -1167,8 +1174,8 @@ export interface ExtHostLanguageFeaturesShape {
 	$releaseWorkspaceSymbols(handle: number, id: number): void;
 	$provideRenameEdits(handle: number, resource: UriComponents, position: IPosition, newName: string, token: CancellationToken): Promise<IWorkspaceEditDto | undefined>;
 	$resolveRenameLocation(handle: number, resource: UriComponents, position: IPosition, token: CancellationToken): Promise<modes.RenameLocation | undefined>;
-	$provideSemanticColoring(handle: number, resource: UriComponents, previousSemanticColoringResultId: number, token: CancellationToken): Promise<VSBuffer | null>;
-	$releaseSemanticColoring(handle: number, semanticColoringResultId: number): void;
+	$provideSemanticTokens(handle: number, resource: UriComponents, ranges: IRange[] | null, previousResultId: number, token: CancellationToken): Promise<VSBuffer | null>;
+	$releaseSemanticTokens(handle: number, semanticColoringResultId: number): void;
 	$provideCompletionItems(handle: number, resource: UriComponents, position: IPosition, context: modes.CompletionContext, token: CancellationToken): Promise<ISuggestResultDto | undefined>;
 	$resolveCompletionItem(handle: number, resource: UriComponents, position: IPosition, id: ChainedCacheId, token: CancellationToken): Promise<ISuggestDataDto | undefined>;
 	$releaseCompletionItems(handle: number, id: number): void;
@@ -1282,6 +1289,7 @@ export interface IDataBreakpointDto extends IBreakpointDto {
 	dataId: string;
 	canPersist: boolean;
 	label: string;
+	accessTypes?: DebugProtocol.DataBreakpointAccessType[];
 }
 
 export interface ISourceBreakpointDto extends IBreakpointDto {
@@ -1385,6 +1393,11 @@ export interface ExtHostStorageShape {
 	$acceptValue(shared: boolean, key: string, value: object | undefined): void;
 }
 
+
+export interface ExtHostTunnelServiceShape {
+	$findCandidatePorts(): Promise<{ port: number, detail: string }[]>;
+}
+
 // --- proxy identifiers
 
 export const MainContext = {
@@ -1425,7 +1438,8 @@ export const MainContext = {
 	MainThreadSearch: createMainId<MainThreadSearchShape>('MainThreadSearch'),
 	MainThreadTask: createMainId<MainThreadTaskShape>('MainThreadTask'),
 	MainThreadWindow: createMainId<MainThreadWindowShape>('MainThreadWindow'),
-	MainThreadLabelService: createMainId<MainThreadLabelServiceShape>('MainThreadLabelService')
+	MainThreadLabelService: createMainId<MainThreadLabelServiceShape>('MainThreadLabelService'),
+	MainThreadTunnelService: createMainId<MainThreadTunnelServiceShape>('MainThreadTunnelService')
 };
 
 export const ExtHostContext = {
@@ -1459,5 +1473,6 @@ export const ExtHostContext = {
 	ExtHostStorage: createMainId<ExtHostStorageShape>('ExtHostStorage'),
 	ExtHostUrls: createExtId<ExtHostUrlsShape>('ExtHostUrls'),
 	ExtHostOutputService: createMainId<ExtHostOutputServiceShape>('ExtHostOutputService'),
-	ExtHosLabelService: createMainId<ExtHostLabelServiceShape>('ExtHostLabelService')
+	ExtHosLabelService: createMainId<ExtHostLabelServiceShape>('ExtHostLabelService'),
+	ExtHostTunnelService: createMainId<ExtHostTunnelServiceShape>('ExtHostTunnelService')
 };
