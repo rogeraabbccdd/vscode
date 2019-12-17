@@ -61,6 +61,10 @@ suite('EditorGroupsService', () => {
 
 		class TestEditorInputFactory implements IEditorInputFactory {
 
+			canSerialize(editorInput: EditorInput): boolean {
+				return true;
+			}
+
 			serialize(editorInput: EditorInput): string {
 				const testEditorInput = <TestEditorInput>editorInput;
 				const testInput: ISerializedTestEditorInput = {
@@ -435,6 +439,8 @@ suite('EditorGroupsService', () => {
 		assert.equal(group.isActive(inputInactive), false);
 		assert.equal(group.isOpened(input), true);
 		assert.equal(group.isOpened(inputInactive), true);
+		assert.equal(group.isOpened({ resource: input.getResource() }), true);
+		assert.equal(group.isOpened({ resource: inputInactive.getResource() }), true);
 		assert.equal(group.isEmpty, false);
 		assert.equal(group.count, 2);
 		assert.equal(editorWillOpenCounter, 2);

@@ -840,6 +840,8 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 	}
 
 	private validateWindowState(state: IWindowState, displays: Display[]): IWindowState | undefined {
+		this.logService.trace(`window#validateWindowState: validating window state on ${displays.length} display(s)`, state);
+
 		if (typeof state.x !== 'number'
 			|| typeof state.y !== 'number'
 			|| typeof state.width !== 'number'
@@ -855,33 +857,48 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		}
 
 		// Single Monitor: be strict about x/y positioning
+		// macOS & Linux: these OS seem to be pretty good in ensuring that a window is never outside of it's bounds.
+		// Windows: it is possible to have a window with a size that makes it fall out of the window. our strategy
+		//          is to try as much as possible to keep the window in the monitor bounds. we are not as strict as
+		//          macOS and Linux and allow the window to exceed the monitor bounds as long as the window is still
+		//          some pixels (128) visible on the screen for the user to drag it back.
 		if (displays.length === 1) {
 			const displayWorkingArea = this.getWorkingArea(displays[0]);
 			if (displayWorkingArea) {
-				this.logService.trace('window#validateWindowState: 1 display', displayWorkingArea);
+				this.logService.trace('window#validateWindowState: 1 monitor working area', displayWorkingArea);
 
 				if (state.x < displayWorkingArea.x) {
-					state.x = displayWorkingArea.x; // prevent window from falling out of the screen to the left
+					// prevent window from falling out of the screen to the left
+					state.x = displayWorkingArea.x;
 				}
 
 				if (state.y < displayWorkingArea.y) {
-					state.y = displayWorkingArea.y; // prevent window from falling out of the screen to the top
-				}
-
-				if (state.x > (displayWorkingArea.x + displayWorkingArea.width)) {
-					state.x = displayWorkingArea.x; // prevent window from falling out of the screen to the right
-				}
-
-				if (state.y > (displayWorkingArea.y + displayWorkingArea.height)) {
-					state.y = displayWorkingArea.y; // prevent window from falling out of the screen to the bottom
+					// prevent window from falling out of the screen to the top
+					state.y = displayWorkingArea.y;
 				}
 
 				if (state.width > displayWorkingArea.width) {
-					state.width = displayWorkingArea.width; // prevent window from exceeding display bounds width
+					// prevent window from exceeding display bounds width
+					state.width = displayWorkingArea.width;
 				}
 
 				if (state.height > displayWorkingArea.height) {
-					state.height = displayWorkingArea.height; // prevent window from exceeding display bounds height
+					// prevent window from exceeding display bounds height
+					state.height = displayWorkingArea.height;
+				}
+
+				if (state.x > (displayWorkingArea.x + displayWorkingArea.width - 128)) {
+					// prevent window from falling out of the screen to the right with
+					// 128px margin by positioning the window to the far right edge of
+					// the screen
+					state.x = displayWorkingArea.x + displayWorkingArea.width - state.width;
+				}
+
+				if (state.y > (displayWorkingArea.y + displayWorkingArea.height - 128)) {
+					// prevent window from falling out of the screen to the bottom with
+					// 128px margin by positioning the window to the far bottom edge of
+					// the screen
+					state.y = displayWorkingArea.y + displayWorkingArea.height - state.height;
 				}
 			}
 
@@ -914,7 +931,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			bounds.x + bounds.width > displayWorkingArea.x &&				// prevent window from falling out of the screen to the left
 			bounds.y + bounds.height > displayWorkingArea.y					// prevent window from falling out of the scree nto the top
 		) {
-			this.logService.trace('window#validateWindowState: multi display', displayWorkingArea);
+			this.logService.trace('window#validateWindowState: multi-monitor working area', displayWorkingArea);
 
 			return state;
 		}

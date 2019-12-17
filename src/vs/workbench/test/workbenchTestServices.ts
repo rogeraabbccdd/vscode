@@ -11,8 +11,8 @@ import * as resources from 'vs/base/common/resources';
 import { URI } from 'vs/base/common/uri';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
-import { IEditorInputWithOptions, CloseDirection, IEditorIdentifier, IUntitledTextResourceInput, IResourceDiffInput, IResourceSideBySideInput, IEditorInput, IEditor, IEditorCloseEvent, IEditorPartOptions, IRevertOptions } from 'vs/workbench/common/editor';
-import { IEditorOpeningEvent, EditorServiceImpl, IEditorGroupView } from 'vs/workbench/browser/parts/editor/editor';
+import { IEditorInputWithOptions, CloseDirection, IEditorIdentifier, IUntitledTextResourceInput, IResourceDiffInput, IResourceSideBySideInput, IEditorInput, IEditor, IEditorCloseEvent, IEditorPartOptions, IRevertOptions, EditorInput, IFileEditorInput, GroupIdentifier, ISaveOptions } from 'vs/workbench/common/editor';
+import { IEditorOpeningEvent, EditorServiceImpl, IEditorGroupView, IEditorGroupsAccessor } from 'vs/workbench/browser/parts/editor/editor';
 import { Event, Emitter } from 'vs/base/common/event';
 import Severity from 'vs/base/common/severity';
 import { IBackupFileService, IResolvedBackup } from 'vs/workbench/services/backup/common/backup';
@@ -20,7 +20,7 @@ import { IConfigurationService, ConfigurationTarget } from 'vs/platform/configur
 import { IWorkbenchLayoutService, Parts, Position as PartPosition } from 'vs/workbench/services/layout/browser/layoutService';
 import { TextModelResolverService } from 'vs/workbench/services/textmodelResolver/common/textModelResolverService';
 import { ITextModelService } from 'vs/editor/common/services/resolverService';
-import { IEditorOptions, IResourceInput } from 'vs/platform/editor/common/editor';
+import { IEditorOptions, IResourceInput, IEditorModel } from 'vs/platform/editor/common/editor';
 import { IUntitledTextEditorService, UntitledTextEditorService } from 'vs/workbench/services/untitled/common/untitledTextEditorService';
 import { IWorkspaceContextService, IWorkspace as IWorkbenchWorkspace, WorkbenchState, IWorkspaceFolder, IWorkspaceFoldersChangeEvent, Workspace } from 'vs/platform/workspace/common/workspace';
 import { ILifecycleService, BeforeShutdownEvent, ShutdownReason, StartupKind, LifecyclePhase, WillShutdownEvent } from 'vs/platform/lifecycle/common/lifecycle';
@@ -69,7 +69,7 @@ import { timeout } from 'vs/base/common/async';
 import { IViewletService } from 'vs/workbench/services/viewlet/browser/viewlet';
 import { ViewletDescriptor, Viewlet } from 'vs/workbench/browser/viewlet';
 import { IViewlet } from 'vs/workbench/common/viewlet';
-import { IStorageService, InMemoryStorageService } from 'vs/platform/storage/common/storage';
+import { IStorageService, InMemoryStorageService, IWillSaveStateEvent } from 'vs/platform/storage/common/storage';
 import { isLinux, isMacintosh } from 'vs/base/common/platform';
 import { LabelService } from 'vs/workbench/services/label/common/labelService';
 import { IDimension } from 'vs/platform/layout/browser/layoutService';
@@ -311,7 +311,7 @@ export function workbenchInstantiationService(): IInstantiationService {
 	instantiationService.stub(ITextModelService, <ITextModelService>instantiationService.createInstance(TextModelResolverService));
 	instantiationService.stub(IThemeService, new TestThemeService());
 	instantiationService.stub(ILogService, new NullLogService());
-	instantiationService.stub(IEditorGroupsService, new TestEditorGroupsService([new TestEditorGroup(0)]));
+	instantiationService.stub(IEditorGroupsService, new TestEditorGroupsService([new TestEditorGroupView(0)]));
 	instantiationService.stub(ILabelService, <ILabelService>instantiationService.createInstance(LabelService));
 	const editorService = new TestEditorService();
 	instantiationService.stub(IEditorService, editorService);
@@ -346,46 +346,24 @@ export class TestMenuService implements IMenuService {
 
 export class TestHistoryService implements IHistoryService {
 
-	public _serviceBrand: undefined;
+	_serviceBrand: undefined;
 
-	constructor(private root?: URI) {
-	}
+	constructor(private root?: URI) { }
 
-	public reopenLastClosedEditor(): void {
-	}
-
-	public forward(_acrossEditors?: boolean): void {
-	}
-
-	public back(_acrossEditors?: boolean): void {
-	}
-
-	public last(): void {
-	}
-
-	public remove(_input: IEditorInput | IResourceInput): void {
-	}
-
-	public clear(): void {
-	}
-
-	public clearRecentlyOpened(): void {
-	}
-
-	public getHistory(): Array<IEditorInput | IResourceInput> {
-		return [];
-	}
-
-	public getLastActiveWorkspaceRoot(_schemeFilter: string): URI | undefined {
-		return this.root;
-	}
-
-	public getLastActiveFile(_schemeFilter: string): URI | undefined {
-		return undefined;
-	}
-
-	public openLastEditLocation(): void {
-	}
+	reopenLastClosedEditor(): void { }
+	forward(): void { }
+	back(): void { }
+	last(): void { }
+	remove(_input: IEditorInput | IResourceInput): void { }
+	clear(): void { }
+	clearRecentlyOpened(): void { }
+	getHistory(): Array<IEditorInput | IResourceInput> { return []; }
+	openNextRecentlyUsedEditor(group?: GroupIdentifier): void { }
+	openPreviouslyUsedEditor(group?: GroupIdentifier): void { }
+	getMostRecentlyUsedOpenEditors(): Array<IEditorIdentifier> { return []; }
+	getLastActiveWorkspaceRoot(_schemeFilter: string): URI | undefined { return this.root; }
+	getLastActiveFile(_schemeFilter: string): URI | undefined { return undefined; }
+	openLastEditLocation(): void { }
 }
 
 export class TestDialogService implements IDialogService {
@@ -677,13 +655,16 @@ export class TestPanelService implements IPanelService {
 	}
 }
 
-export class TestStorageService extends InMemoryStorageService { }
+export class TestStorageService extends InMemoryStorageService {
+	readonly _onWillSaveState: Emitter<IWillSaveStateEvent> = this._register(new Emitter<IWillSaveStateEvent>());
+	readonly onWillSaveState: Event<IWillSaveStateEvent> = this._onWillSaveState.event;
+}
 
 export class TestEditorGroupsService implements IEditorGroupsService {
 
 	_serviceBrand: undefined;
 
-	constructor(public groups: TestEditorGroup[] = []) { }
+	constructor(public groups: TestEditorGroupView[] = []) { }
 
 	onDidActiveGroupChange: Event<IEditorGroup> = Event.None;
 	onDidActivateGroup: Event<IEditorGroup> = Event.None;
@@ -773,7 +754,7 @@ export class TestEditorGroupsService implements IEditorGroupsService {
 	}
 }
 
-export class TestEditorGroup implements IEditorGroupView {
+export class TestEditorGroupView implements IEditorGroupView {
 
 	constructor(public id: number) { }
 
@@ -825,7 +806,7 @@ export class TestEditorGroup implements IEditorGroupView {
 		throw new Error('not implemented');
 	}
 
-	isOpened(_editor: IEditorInput): boolean {
+	isOpened(_editor: IEditorInput | IResourceInput): boolean {
 		return false;
 	}
 
@@ -871,6 +852,76 @@ export class TestEditorGroup implements IEditorGroupView {
 	toJSON(): object { return Object.create(null); }
 	layout(_width: number, _height: number): void { }
 	relayout() { }
+}
+
+export class TestEditorGroupAccessor implements IEditorGroupsAccessor {
+
+	groups: IEditorGroupView[] = [];
+	activeGroup!: IEditorGroupView;
+
+	partOptions: IEditorPartOptions = {};
+
+	onDidEditorPartOptionsChange = Event.None;
+	onDidVisibilityChange = Event.None;
+
+	getGroup(identifier: number): IEditorGroupView | undefined { throw new Error('Method not implemented.'); }
+	getGroups(order: GroupsOrder): IEditorGroupView[] { throw new Error('Method not implemented.'); }
+	activateGroup(identifier: number | IEditorGroupView): IEditorGroupView { throw new Error('Method not implemented.'); }
+	restoreGroup(identifier: number | IEditorGroupView): IEditorGroupView { throw new Error('Method not implemented.'); }
+	addGroup(location: number | IEditorGroupView, direction: GroupDirection, options?: IAddGroupOptions | undefined): IEditorGroupView { throw new Error('Method not implemented.'); }
+	mergeGroup(group: number | IEditorGroupView, target: number | IEditorGroupView, options?: IMergeGroupOptions | undefined): IEditorGroupView { throw new Error('Method not implemented.'); }
+	moveGroup(group: number | IEditorGroupView, location: number | IEditorGroupView, direction: GroupDirection): IEditorGroupView { throw new Error('Method not implemented.'); }
+	copyGroup(group: number | IEditorGroupView, location: number | IEditorGroupView, direction: GroupDirection): IEditorGroupView { throw new Error('Method not implemented.'); }
+	removeGroup(group: number | IEditorGroupView): void { throw new Error('Method not implemented.'); }
+	arrangeGroups(arrangement: GroupsArrangement, target?: number | IEditorGroupView | undefined): void { throw new Error('Method not implemented.'); }
+}
+
+export class TestEditorInput extends EditorInput implements IFileEditorInput {
+	public gotDisposed = false;
+	public gotSaved = false;
+	public gotSavedAs = false;
+	public gotReverted = false;
+	public dirty = false;
+	private fails = false;
+	constructor(public resource: URI) { super(); }
+
+	getTypeId() { return 'testEditorInputForEditorService'; }
+	resolve(): Promise<IEditorModel | null> { return !this.fails ? Promise.resolve(null) : Promise.reject(new Error('fails')); }
+	matches(other: TestEditorInput): boolean { return other && other.resource && this.resource.toString() === other.resource.toString() && other instanceof TestEditorInput; }
+	setEncoding(encoding: string) { }
+	getEncoding() { return undefined; }
+	setPreferredEncoding(encoding: string) { }
+	setMode(mode: string) { }
+	setPreferredMode(mode: string) { }
+	getResource(): URI { return this.resource; }
+	setForceOpenAsBinary(): void { }
+	setFailToOpen(): void {
+		this.fails = true;
+	}
+	save(groupId: GroupIdentifier, options?: ISaveOptions): Promise<boolean> {
+		this.gotSaved = true;
+		return Promise.resolve(true);
+	}
+	saveAs(groupId: GroupIdentifier, options?: ISaveOptions): Promise<boolean> {
+		this.gotSavedAs = true;
+		return Promise.resolve(true);
+	}
+	revert(options?: IRevertOptions): Promise<boolean> {
+		this.gotReverted = true;
+		this.gotSaved = false;
+		this.gotSavedAs = false;
+		return Promise.resolve(true);
+	}
+	isDirty(): boolean {
+		return this.dirty;
+	}
+	isReadonly(): boolean {
+		return false;
+	}
+	dispose(): void {
+		super.dispose();
+		this.gotDisposed = true;
+	}
 }
 
 export class TestEditorService implements EditorServiceImpl {
