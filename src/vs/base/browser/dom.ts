@@ -287,7 +287,7 @@ export function addDisposableGenericMouseUpListner(node: EventTarget, handler: (
 export function addDisposableNonBubblingMouseOutListener(node: Element, handler: (event: MouseEvent) => void): IDisposable {
 	return addDisposableListener(node, 'mouseout', (e: MouseEvent) => {
 		// Mouse out bubbles, so this is an attempt to ignore faux mouse outs coming from children elements
-		let toElement: Node | null = <Node>(e.relatedTarget || e.target);
+		let toElement: Node | null = <Node>(e.relatedTarget);
 		while (toElement && toElement !== node) {
 			toElement = toElement.parentNode;
 		}
@@ -302,7 +302,7 @@ export function addDisposableNonBubblingMouseOutListener(node: Element, handler:
 export function addDisposableNonBubblingPointerOutListener(node: Element, handler: (event: MouseEvent) => void): IDisposable {
 	return addDisposableListener(node, 'pointerout', (e: MouseEvent) => {
 		// Mouse out bubbles, so this is an attempt to ignore faux mouse outs coming from children elements
-		let toElement: Node | null = <Node>(e.relatedTarget || e.target);
+		let toElement: Node | null = <Node>(e.relatedTarget);
 		while (toElement && toElement !== node) {
 			toElement = toElement.parentNode;
 		}
@@ -818,6 +818,27 @@ export function findParentWithClass(node: HTMLElement, clazz: string, stopAtClaz
 
 export function hasParentWithClass(node: HTMLElement, clazz: string, stopAtClazzOrNode?: string | HTMLElement): boolean {
 	return !!findParentWithClass(node, clazz, stopAtClazzOrNode);
+}
+
+export function isShadowRoot(node: Node): node is ShadowRoot {
+	return (
+		node && !!(<ShadowRoot>node).host && !!(<ShadowRoot>node).mode
+	);
+}
+
+export function isInShadowDOM(domNode: Node): boolean {
+	return !!getShadowRoot(domNode);
+}
+
+export function getShadowRoot(domNode: Node): ShadowRoot | null {
+	while (domNode.parentNode) {
+		if (domNode === document.body) {
+			// reached the body
+			return null;
+		}
+		domNode = domNode.parentNode;
+	}
+	return isShadowRoot(domNode) ? domNode : null;
 }
 
 export function createStyleSheet(container: HTMLElement = document.getElementsByTagName('head')[0]): HTMLStyleElement {

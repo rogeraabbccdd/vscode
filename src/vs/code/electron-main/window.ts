@@ -9,7 +9,7 @@ import * as os from 'os';
 import * as nls from 'vs/nls';
 import { Event as CommonEvent, Emitter } from 'vs/base/common/event';
 import { URI } from 'vs/base/common/uri';
-import { screen, BrowserWindow, systemPreferences, app, TouchBar, nativeImage, Rectangle, Display, TouchBarSegmentedControl, NativeImage, BrowserWindowConstructorOptions, SegmentedControlSegment } from 'electron';
+import { screen, BrowserWindow, systemPreferences, app, TouchBar, nativeImage, Rectangle, Display, TouchBarSegmentedControl, NativeImage, BrowserWindowConstructorOptions, SegmentedControlSegment, nativeTheme } from 'electron';
 import { IEnvironmentService, ParsedArgs } from 'vs/platform/environment/common/environment';
 import { ILogService } from 'vs/platform/log/common/log';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
@@ -131,11 +131,6 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 				show: !isFullscreenOrMaximized,
 				title: product.nameLong,
 				webPreferences: {
-					// By default if Code is in the background, intervals and timeouts get throttled, so we
-					// want to enforce that Code stays in the foreground. This triggers a disable_hidden_
-					// flag that Electron provides via patch:
-					// https://github.com/electron/libchromiumcontent/blob/master/patches/common/chromium/disable_hidden.patch
-					backgroundThrottling: false,
 					nodeIntegration: true,
 					nodeIntegrationInWorker: RUN_TEXTMATE_IN_WORKER,
 					webviewTag: true
@@ -412,9 +407,9 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		});
 
 		this._win.webContents.session.webRequest.onHeadersReceived(null!, (details, callback) => {
-			const responseHeaders = details.responseHeaders as { [key: string]: string[] };
+			const responseHeaders = details.responseHeaders as Record<string, (string) | (string[])>;
 
-			const contentType: string[] = (responseHeaders['content-type'] || responseHeaders['Content-Type']);
+			const contentType = (responseHeaders['content-type'] || responseHeaders['Content-Type']);
 			if (contentType && Array.isArray(contentType) && contentType.some(x => x.toLowerCase().indexOf('image/svg') >= 0)) {
 				return callback({ cancel: true });
 			}
@@ -506,7 +501,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		// Inject headers when requests are incoming
 		const urls = ['https://marketplace.visualstudio.com/*', 'https://*.vsassets.io/*'];
 		this._win.webContents.session.webRequest.onBeforeSendHeaders({ urls }, (details, cb) =>
-			this.marketplaceHeadersPromise.then(headers => cb({ cancel: false, requestHeaders: objects.assign(details.requestHeaders, headers) as { [key: string]: string | undefined } })));
+			this.marketplaceHeadersPromise.then(headers => cb({ cancel: false, requestHeaders: objects.assign(details.requestHeaders, headers) as Record<string, string> })));
 	}
 
 	private onWindowError(error: WindowError): void {
@@ -715,7 +710,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		if (windowConfig?.autoDetectHighContrast === false) {
 			autoDetectHighContrast = false;
 		}
-		windowConfiguration.highContrast = isWindows && autoDetectHighContrast && systemPreferences.isInvertedColorScheme();
+		windowConfiguration.highContrast = isWindows && autoDetectHighContrast && nativeTheme.shouldUseInvertedColorScheme;
 		windowConfiguration.accessibilitySupport = app.accessibilitySupportEnabled;
 
 		// Title style related
@@ -867,15 +862,24 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			if (displayWorkingArea) {
 				this.logService.trace('window#validateWindowState: 1 monitor working area', displayWorkingArea);
 
-				if (state.x < displayWorkingArea.x) {
-					// prevent window from falling out of the screen to the left
-					state.x = displayWorkingArea.x;
+				function ensureStateInDisplayWorkingArea(): void {
+					if (!state || typeof state.x !== 'number' || typeof state.y !== 'number' || !displayWorkingArea) {
+						return;
+					}
+
+					if (state.x < displayWorkingArea.x) {
+						// prevent window from falling out of the screen to the left
+						state.x = displayWorkingArea.x;
+					}
+
+					if (state.y < displayWorkingArea.y) {
+						// prevent window from falling out of the screen to the top
+						state.y = displayWorkingArea.y;
+					}
 				}
 
-				if (state.y < displayWorkingArea.y) {
-					// prevent window from falling out of the screen to the top
-					state.y = displayWorkingArea.y;
-				}
+				// ensure state is not outside display working area (top, left)
+				ensureStateInDisplayWorkingArea();
 
 				if (state.width > displayWorkingArea.width) {
 					// prevent window from exceeding display bounds width
@@ -900,6 +904,10 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 					// the screen
 					state.y = displayWorkingArea.y + displayWorkingArea.height - state.height;
 				}
+
+				// again ensure state is not outside display working area
+				// (it may have changed from the previous validation step)
+				ensureStateInDisplayWorkingArea();
 			}
 
 			return state;
@@ -919,17 +927,16 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 			}
 		}
 
-		// Multi Monitor (non-fullscreen): be less strict because metrics can be crazy
-		const bounds = { x: state.x, y: state.y, width: state.width, height: state.height };
-		const display = screen.getDisplayMatching(bounds);
+		// Multi Monitor (non-fullscreen): ensure window is within display bounds
+		const display = screen.getDisplayMatching({ x: state.x, y: state.y, width: state.width, height: state.height });
 		const displayWorkingArea = this.getWorkingArea(display);
 		if (
 			display &&														// we have a display matching the desired bounds
 			displayWorkingArea &&											// we have valid working area bounds
-			bounds.x < displayWorkingArea.x + displayWorkingArea.width &&	// prevent window from falling out of the screen to the right
-			bounds.y < displayWorkingArea.y + displayWorkingArea.height &&	// prevent window from falling out of the screen to the bottom
-			bounds.x + bounds.width > displayWorkingArea.x &&				// prevent window from falling out of the screen to the left
-			bounds.y + bounds.height > displayWorkingArea.y					// prevent window from falling out of the scree nto the top
+			state.x + state.width > displayWorkingArea.x &&					// prevent window from falling out of the screen to the left
+			state.y + state.height > displayWorkingArea.y &&				// prevent window from falling out of the screen to the top
+			state.x < displayWorkingArea.x + displayWorkingArea.width &&	// prevent window from falling out of the screen to the right
+			state.y < displayWorkingArea.y + displayWorkingArea.height		// prevent window from falling out of the screen to the bottom
 		) {
 			this.logService.trace('window#validateWindowState: multi-monitor working area', displayWorkingArea);
 
@@ -1062,22 +1069,22 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		switch (visibility) {
 			case ('default'):
 				this._win.setMenuBarVisibility(!isFullscreen);
-				this._win.setAutoHideMenuBar(isFullscreen);
+				this._win.autoHideMenuBar = isFullscreen;
 				break;
 
 			case ('visible'):
 				this._win.setMenuBarVisibility(true);
-				this._win.setAutoHideMenuBar(false);
+				this._win.autoHideMenuBar = false;
 				break;
 
 			case ('toggle'):
 				this._win.setMenuBarVisibility(false);
-				this._win.setAutoHideMenuBar(true);
+				this._win.autoHideMenuBar = true;
 				break;
 
 			case ('hidden'):
 				this._win.setMenuBarVisibility(false);
-				this._win.setAutoHideMenuBar(false);
+				this._win.autoHideMenuBar = false;
 				break;
 		}
 	}
