@@ -12,8 +12,7 @@ import { TokenTheme } from 'vs/editor/common/modes/supports/tokenization';
 import { ILineTokens, IToken, TokenizationSupport2Adapter, TokensProvider } from 'vs/editor/standalone/browser/standaloneLanguages';
 import { IStandaloneTheme, IStandaloneThemeData, IStandaloneThemeService } from 'vs/editor/standalone/common/standaloneThemeService';
 import { ColorIdentifier } from 'vs/platform/theme/common/colorRegistry';
-import { IIconTheme, ITheme, LIGHT } from 'vs/platform/theme/common/themeService';
-import { IDisposable } from 'vs/base/common/lifecycle';
+import { IIconTheme, ITheme, LIGHT, ITokenStyle } from 'vs/platform/theme/common/themeService';
 
 suite('TokenizationSupport2Adapter', () => {
 
@@ -35,9 +34,6 @@ suite('TokenizationSupport2Adapter', () => {
 
 	class MockThemeService implements IStandaloneThemeService {
 		_serviceBrand: undefined;
-		public registerEditorContainer(domNode: HTMLElement): IDisposable {
-			throw new Error('Not implemented');
-		}
 		public setTheme(themeName: string): string {
 			throw new Error('Not implemented');
 		}
@@ -60,7 +56,7 @@ suite('TokenizationSupport2Adapter', () => {
 					throw new Error('Not implemented');
 				},
 
-				getTokenStyleMetadata: (type: string, modifiers: string[]): number | undefined => {
+				getTokenStyleMetadata: (type: string, modifiers: string[]): ITokenStyle | undefined => {
 					return undefined;
 				},
 

@@ -165,7 +165,7 @@ export abstract class ReferencesController implements IEditorContribution {
 					let selection = this._model.nearestReference(uri, pos);
 					if (selection) {
 						return this._widget.setSelection(selection).then(() => {
-							if (this._widget && this._editor.getOption(EditorOption.peekWidgetFocusInlineEditor)) {
+							if (this._widget && this._editor.getOption(EditorOption.peekWidgetDefaultFocus) === 'editor') {
 								this._widget.focusOnPreviewEditor();
 							}
 						});
@@ -300,7 +300,7 @@ function withController(accessor: ServicesAccessor, fn: (controller: ReferencesC
 }
 
 KeybindingsRegistry.registerCommandAndKeybindingRule({
-	id: 'changePeekFocus',
+	id: 'togglePeekWidgetFocus',
 	weight: KeybindingWeight.EditorContrib,
 	primary: KeyChord(KeyMod.CtrlCmd | KeyCode.KEY_K, KeyCode.F2),
 	when: ContextKeyExpr.or(ctxReferenceSearchVisible, PeekContext.inPeekEditor),

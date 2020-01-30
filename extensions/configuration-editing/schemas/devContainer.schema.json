@@ -3,9 +3,11 @@
 	"description": "Defines a dev container",
 	"allowComments": true,
 	"type": "object",
+	"additionalProperties": false,
 	"definitions": {
 		"devContainerCommon": {
 			"type": "object",
+			"additionalProperties": false,
 			"properties": {
 				"name": {
 					"type": "string",
@@ -23,6 +25,13 @@
 				"settings": {
 					"$ref": "vscode://schemas/settings/machine",
 					"description": "Machine specific settings that should be copied into the container."
+				},
+				"forwardPorts": {
+					"type": "array",
+					"description": "Ports that are forwarded from the container to the local machine.",
+					"items": {
+						"type": "integer"
+					}
 				},
 				"remoteEnv": {
 					"type": "object",
@@ -56,6 +65,7 @@
 		},
 		"nonComposeBase": {
 			"type": "object",
+			"additionalProperties": false,
 			"properties": {
 				"appPort": {
 					"type": [
@@ -124,6 +134,7 @@
 		},
 		"dockerFileContainer": {
 			"type": "object",
+			"additionalProperties": false,
 			"properties": {
 				"dockerFile": {
 					"type": "string",
@@ -140,6 +151,7 @@
 		},
 		"imageContainer": {
 			"type": "object",
+			"additionalProperties": false,
 			"properties": {
 				"image": {
 					"type": "string",
@@ -152,6 +164,7 @@
 		},
 		"composeContainer": {
 			"type": "object",
+			"additionalProperties": false,
 			"properties": {
 				"dockerComposeFile": {
 					"type": [
