@@ -272,4 +272,5 @@ import 'vs/workbench/contrib/timeline/browser/timeline.contribution';
 // Fonts
 import 'vs/workbench/contrib/fonts/cascadiaCode/cascadiaCode';
 import 'vs/workbench/contrib/fonts/firaCode/firaCode';
+import 'vs/workbench/contrib/fonts/JetBrainsMono/JetBrainsMono';
 //#endregion
