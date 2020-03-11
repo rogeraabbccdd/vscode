@@ -111,11 +111,19 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/contrib/openInDesktop",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/contrib/performance",
 			"project": "vscode-workbench"
 		},
 		{
 			"name": "vs/workbench/contrib/preferences",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/contrib/quickaccess",
 			"project": "vscode-workbench"
 		},
 		{
@@ -259,6 +267,10 @@
 			"project": "vscode-workbench"
 		},
 		{
+			"name": "vs/workbench/services/log",
+			"project": "vscode-workbench"
+		},
+		{
 			"name": "vs/workbench/services/integrity",
 			"project": "vscode-workbench"
 		},
@@ -296,6 +308,10 @@
 		},
 		{
 			"name": "vs/workbench/services/textMate",
+			"project": "vscode-workbench"
+		},
+		{
+			"name": "vs/workbench/services/workingCopy",
 			"project": "vscode-workbench"
 		},
 		{

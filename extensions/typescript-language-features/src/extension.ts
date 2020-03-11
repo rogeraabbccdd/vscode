@@ -18,7 +18,7 @@ import { lazy, Lazy } from './utils/lazy';
 import LogDirectoryProvider from './utils/logDirectoryProvider';
 import ManagedFileContextManager from './utils/managedFileContext';
 import { PluginManager } from './utils/plugins';
-import * as ProjectStatus from './utils/projectStatus';
+import * as ProjectStatus from './utils/largeProjectStatus';
 import TscTaskProvider from './features/task';
 
 export function activate(
@@ -38,7 +38,7 @@ export function activate(
 	});
 
 	registerCommands(commandManager, lazyClientHost, pluginManager);
-	context.subscriptions.push(vscode.workspace.registerTaskProvider('typescript', new TscTaskProvider(lazyClientHost.map(x => x.serviceClient))));
+	context.subscriptions.push(vscode.tasks.registerTaskProvider('typescript', new TscTaskProvider(lazyClientHost.map(x => x.serviceClient))));
 	context.subscriptions.push(new LanguageConfigurationManager());
 
 	import('./features/tsconfig').then(module => {

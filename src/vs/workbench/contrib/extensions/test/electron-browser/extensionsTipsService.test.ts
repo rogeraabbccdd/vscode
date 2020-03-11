@@ -22,7 +22,8 @@ import { Emitter } from 'vs/base/common/event';
 import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 import { NullTelemetryService } from 'vs/platform/telemetry/common/telemetryUtils';
 import { IWorkspaceContextService } from 'vs/platform/workspace/common/workspace';
-import { TestContextService, TestLifecycleService, productService } from 'vs/workbench/test/browser/workbenchTestServices';
+import { TestLifecycleService, productService } from 'vs/workbench/test/browser/workbenchTestServices';
+import { TestContextService } from 'vs/workbench/test/common/workbenchTestServices';
 import { TestSharedProcessService } from 'vs/workbench/test/electron-browser/workbenchTestServices';
 import { TestNotificationService } from 'vs/platform/notification/test/common/testNotificationService';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
@@ -496,7 +497,7 @@ suite('ExtensionsTipsService Test', () => {
 		});
 	});
 
-	test('test global extensions are modified and recommendation change event is fired when an extension is ignored', () => {
+	test('test global extensions are modified and recommendation change event is fired when an extension is ignored', async () => {
 		const storageSetterTarget = sinon.spy();
 		const changeHandlerTarget = sinon.spy();
 		const ignoredExtensionId = 'Some.Extension';
@@ -508,15 +509,15 @@ suite('ExtensionsTipsService Test', () => {
 			}
 		});
 
-		return setUpFolderWorkspace('myFolder', []).then(() => {
-			testObject = instantiationService.createInstance(ExtensionTipsService);
-			testObject.onRecommendationChange(changeHandlerTarget);
-			testObject.toggleIgnoredRecommendation(ignoredExtensionId, true);
+		await setUpFolderWorkspace('myFolder', []);
+		testObject = instantiationService.createInstance(ExtensionTipsService);
+		testObject.onRecommendationChange(changeHandlerTarget);
+		testObject.toggleIgnoredRecommendation(ignoredExtensionId, true);
+		await testObject.loadWorkspaceConfigPromise;
 
-			assert.ok(changeHandlerTarget.calledOnce);
-			assert.ok(changeHandlerTarget.getCall(0).calledWithMatch({ extensionId: 'Some.Extension', isRecommended: false }));
-			assert.ok(storageSetterTarget.calledWithExactly('extensionsAssistant/ignored_recommendations', `["ms-vscode.vscode","${ignoredExtensionId.toLowerCase()}"]`, StorageScope.GLOBAL));
-		});
+		assert.ok(changeHandlerTarget.calledOnce);
+		assert.ok(changeHandlerTarget.getCall(0).calledWithMatch({ extensionId: 'Some.Extension', isRecommended: false }));
+		assert.ok(storageSetterTarget.calledWithExactly('extensionsAssistant/ignored_recommendations', `["ms-vscode.vscode","${ignoredExtensionId.toLowerCase()}"]`, StorageScope.GLOBAL));
 	});
 
 	test('ExtensionTipsService: Get file based recommendations from storage (old format)', () => {

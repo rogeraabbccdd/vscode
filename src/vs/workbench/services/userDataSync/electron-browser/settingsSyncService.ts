@@ -16,6 +16,7 @@ export class SettingsSyncService extends Disposable implements ISettingsSyncServ
 
 	private readonly channel: IChannel;
 
+	readonly resourceKey = 'settings';
 	readonly source = SyncSource.Settings;
 
 	private _status: SyncStatus = SyncStatus.Uninitialized;
@@ -63,21 +64,12 @@ export class SettingsSyncService extends Disposable implements ISettingsSyncServ
 		return this.channel.call('stop');
 	}
 
-	async restart(): Promise<void> {
-		const status = await this.channel.call<SyncStatus>('restart');
-		await this.updateStatus(status);
-	}
-
 	resetLocal(): Promise<void> {
 		return this.channel.call('resetLocal');
 	}
 
 	hasPreviouslySynced(): Promise<boolean> {
 		return this.channel.call('hasPreviouslySynced');
-	}
-
-	hasRemoteData(): Promise<boolean> {
-		return this.channel.call('hasRemoteData');
 	}
 
 	hasLocalData(): Promise<boolean> {
@@ -92,8 +84,16 @@ export class SettingsSyncService extends Disposable implements ISettingsSyncServ
 		return this.channel.call('resolveConflicts', [conflicts]);
 	}
 
-	getRemoteContent(preview?: boolean): Promise<string | null> {
-		return this.channel.call('getRemoteContent', [!!preview]);
+	getRemoteContent(ref?: string, fragment?: string): Promise<string | null> {
+		return this.channel.call('getRemoteContent', [ref, fragment]);
+	}
+
+	getLocalBackupContent(ref?: string, fragment?: string): Promise<string | null> {
+		return this.channel.call('getLocalBackupContent', [ref, fragment]);
+	}
+
+	getRemoteContentFromPreview(): Promise<string | null> {
+		return this.channel.call('getRemoteContentFromPreview', []);
 	}
 
 	private async updateStatus(status: SyncStatus): Promise<void> {

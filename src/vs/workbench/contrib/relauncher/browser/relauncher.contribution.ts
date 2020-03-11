@@ -26,6 +26,7 @@ interface IConfiguration extends IWindowsConfiguration {
 	telemetry: { enableCrashReporter: boolean };
 	workbench: { list: { horizontalScrolling: boolean } };
 	debug: { console: { wordWrap: boolean } };
+	editor: { accessibilitySupport: 'on' | 'off' | 'auto' };
 }
 
 export class SettingsChangeRelauncher extends Disposable implements IWorkbenchContribution {
@@ -39,6 +40,7 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 	private enableCrashReporter: boolean | undefined;
 	private treeHorizontalScrolling: boolean | undefined;
 	private debugConsoleWordWrap: boolean | undefined;
+	private accessibilitySupport: 'on' | 'off' | 'auto' | undefined;
 
 	constructor(
 		@IHostService private readonly hostService: IHostService,
@@ -109,6 +111,14 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 			if (typeof config.telemetry?.enableCrashReporter === 'boolean' && config.telemetry.enableCrashReporter !== this.enableCrashReporter) {
 				this.enableCrashReporter = config.telemetry.enableCrashReporter;
 				changed = true;
+			}
+
+			// On linux turning on accessibility support will also pass this flag to the chrome renderer, thus a restart is required
+			if (isLinux && typeof config.editor?.accessibilitySupport === 'string' && config.editor.accessibilitySupport !== this.accessibilitySupport) {
+				this.accessibilitySupport = config.editor.accessibilitySupport;
+				if (this.accessibilitySupport === 'on') {
+					changed = true;
+				}
 			}
 		}
 

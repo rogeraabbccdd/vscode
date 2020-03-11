@@ -287,10 +287,6 @@ class InspectEditorTokensWidget extends Disposable implements IContentWidget {
 		result += `<tr><td class="tiw-metadata-key">language</td><td class="tiw-metadata-value">${escape(tmMetadata?.languageIdentifier.language || '')}</td></tr>`;
 		result += `<tr><td class="tiw-metadata-key">standard token type</td><td class="tiw-metadata-value">${this._tokenTypeToString(tmMetadata?.tokenType || StandardTokenType.Other)}</td></tr>`;
 
-		result += `</tbody></table>`;
-
-		result += `<hr class="tiw-metadata-separator"/>`;
-		result += `<table class="tiw-metadata-table"><tbody>`;
 		result += this._formatMetadata(semMetadata, tmMetadata);
 		result += `</tbody></table>`;
 
@@ -505,7 +501,7 @@ class InspectEditorTokensWidget extends Disposable implements IContentWidget {
 				const range = new Range(line + 1, character + 1, line + 1, character + 1 + len);
 				const definitions = {};
 				const colorMap = this._themeService.getColorTheme().tokenColorMap;
-				const theme = this._themeService.getTheme() as ColorThemeData;
+				const theme = this._themeService.getColorTheme() as ColorThemeData;
 				const tokenStyle = theme.getTokenStyleMetadata(type, modifiers, true, definitions);
 
 				let metadata: IDecodedMetadata | undefined = undefined;
@@ -532,7 +528,7 @@ class InspectEditorTokensWidget extends Disposable implements IContentWidget {
 		if (definition === undefined) {
 			return '';
 		}
-		const theme = this._themeService.getTheme() as ColorThemeData;
+		const theme = this._themeService.getColorTheme() as ColorThemeData;
 
 		const isTokenStylingRule = (d: any): d is TokenStylingRule => !!d.value;
 		if (Array.isArray(definition)) {
