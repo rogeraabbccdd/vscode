@@ -68,7 +68,14 @@ export class ProgressService extends Disposable implements IProgressService {
 			case ProgressLocation.Notification:
 				return this.withNotificationProgress({ ...options, location }, task, onDidCancel);
 			case ProgressLocation.Window:
-				return this.withWindowProgress({ ...options, location }, task);
+				if ((options as IProgressWindowOptions).command) {
+					// Window progress with command get's shown in the status bar
+					return this.withWindowProgress({ ...options, location }, task);
+				}
+				// Window progress without command can be shown as silent notification
+				// which will first appear in the status bar and can then be brought to
+				// the front when clicking.
+				return this.withNotificationProgress({ ...options, silent: true, location: ProgressLocation.Notification }, task, onDidCancel);
 			case ProgressLocation.Explorer:
 				return this.withViewletProgress('workbench.view.explorer', task, { ...options, location });
 			case ProgressLocation.Scm:
@@ -251,7 +258,7 @@ export class ProgressService extends Disposable implements IProgressService {
 			return toDisposable(() => promiseResolve());
 		};
 
-		const createNotification = (message: string, increment?: number): INotificationHandle => {
+		const createNotification = (message: string, silent: boolean, increment?: number): INotificationHandle => {
 			const notificationDisposables = new DisposableStore();
 
 			const primaryActions = options.primaryActions ? Array.from(options.primaryActions) : [];
@@ -294,7 +301,8 @@ export class ProgressService extends Disposable implements IProgressService {
 				message,
 				source: options.source,
 				actions: { primary: primaryActions, secondary: secondaryActions },
-				progress: typeof increment === 'number' && increment >= 0 ? { total: 100, worked: increment } : { infinite: true }
+				progress: typeof increment === 'number' && increment >= 0 ? { total: 100, worked: increment } : { infinite: true },
+				silent
 			});
 
 			// Switch to window based progress once the notification
@@ -302,8 +310,7 @@ export class ProgressService extends Disposable implements IProgressService {
 			// Remove that window based progress once the notification
 			// shows again.
 			let windowProgressDisposable: IDisposable | undefined = undefined;
-			notificationDisposables.add(notification.onDidChangeVisibility(visible => {
-
+			const onVisibilityChange = (visible: boolean) => {
 				// Clear any previous running window progress
 				dispose(windowProgressDisposable);
 
@@ -311,7 +318,11 @@ export class ProgressService extends Disposable implements IProgressService {
 				if (!visible && !progressStateModel.done) {
 					windowProgressDisposable = createWindowProgress();
 				}
-			}));
+			};
+			notificationDisposables.add(notification.onDidChangeVisibility(onVisibilityChange));
+			if (silent) {
+				onVisibilityChange(false);
+			}
 
 			// Clear upon dispose
 			Event.once(notification.onDidClose)(() => notificationDisposables.dispose());
@@ -346,10 +357,10 @@ export class ProgressService extends Disposable implements IProgressService {
 				// create notification now or after a delay
 				if (typeof options.delay === 'number' && options.delay > 0) {
 					if (typeof notificationTimeout !== 'number') {
-						notificationTimeout = setTimeout(() => notificationHandle = createNotification(titleAndMessage!, step?.increment), options.delay);
+						notificationTimeout = setTimeout(() => notificationHandle = createNotification(titleAndMessage!, !!options.silent, step?.increment), options.delay);
 					}
 				} else {
-					notificationHandle = createNotification(titleAndMessage, step?.increment);
+					notificationHandle = createNotification(titleAndMessage, !!options.silent, step?.increment);
 				}
 			}
 

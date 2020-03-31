@@ -56,7 +56,7 @@ export interface ParsedArgs {
 	'open-url'?: boolean;
 	'skip-getting-started'?: boolean;
 	'skip-release-notes'?: boolean;
-	'sticky-quickopen'?: boolean;
+	'sticky-quickinput'?: boolean;
 	'disable-restore-windows'?: boolean;
 	'disable-telemetry'?: boolean;
 	'export-default-configuration'?: string;
@@ -73,6 +73,7 @@ export interface ParsedArgs {
 	'disable-user-env-probe'?: boolean;
 	'force'?: boolean;
 	'force-user-env'?: boolean;
+	'sync'?: 'on' | 'off';
 
 	// chromium command line args: https://electronjs.org/docs/all#supported-chrome-command-line-switches
 	'no-proxy-server'?: boolean;
@@ -123,12 +124,11 @@ export interface IEnvironmentService extends IUserHomeProvider {
 	keybindingsResource: URI;
 	keyboardLayoutResource: URI;
 	argvResource: URI;
+	snippetsHome: URI;
 
 	// sync resources
 	userDataSyncLogResource: URI;
 	userDataSyncHome: URI;
-	settingsSyncPreviewResource: URI;
-	keybindingsSyncPreviewResource: URI;
 
 	machineSettingsResource: URI;
 
@@ -146,6 +146,7 @@ export interface IEnvironmentService extends IUserHomeProvider {
 	extensionsPath?: string;
 	extensionDevelopmentLocationURI?: URI[];
 	extensionTestsLocationURI?: URI;
+	extensionEnabledProposedApi?: string[] | undefined;
 	logExtensionHostCommunication?: boolean;
 
 	debugExtensionHost: IExtensionHostDebugParams;
@@ -166,5 +167,5 @@ export interface IEnvironmentService extends IUserHomeProvider {
 	driverHandle?: string;
 	driverVerbose: boolean;
 
-	galleryMachineIdResource?: URI;
+	serviceMachineIdResource?: URI;
 }
