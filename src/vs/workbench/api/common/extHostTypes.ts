@@ -6,18 +6,15 @@
 import { coalesce, equals } from 'vs/base/common/arrays';
 import { escapeCodicons } from 'vs/base/common/codicons';
 import { illegalArgument } from 'vs/base/common/errors';
-import { Emitter } from 'vs/base/common/event';
 import { IRelativePattern } from 'vs/base/common/glob';
 import { isMarkdownString } from 'vs/base/common/htmlContent';
 import { startsWith } from 'vs/base/common/strings';
+import { isStringArray } from 'vs/base/common/types';
 import { URI } from 'vs/base/common/uri';
 import { generateUuid } from 'vs/base/common/uuid';
 import { FileSystemProviderErrorCode, markAsFileSystemProviderError } from 'vs/platform/files/common/files';
 import { RemoteAuthorityResolverErrorCode } from 'vs/platform/remote/common/remoteAuthorityResolver';
 import type * as vscode from 'vscode';
-import { Cache } from './cache';
-import { assertIsDefined } from 'vs/base/common/types';
-import { Schemas } from 'vs/base/common/network';
 
 function es5ClassCompat(target: Function): any {
 	///@ts-expect-error
@@ -2420,25 +2417,14 @@ export class SemanticTokensLegend {
 	public readonly tokenTypes: string[];
 	public readonly tokenModifiers: string[];
 
-	constructor(tokenTypes: string[], tokenModifiers: string[]) {
+	constructor(tokenTypes: string[], tokenModifiers: string[] = []) {
 		this.tokenTypes = tokenTypes;
 		this.tokenModifiers = tokenModifiers;
 	}
 }
 
 function isStrArrayOrUndefined(arg: any): arg is string[] | undefined {
-	if (typeof arg === 'undefined') {
-		return true;
-	}
-	if (Array.isArray(arg)) {
-		for (const element of arg) {
-			if (typeof element !== 'string') {
-				return false;
-			}
-		}
-		return true;
-	}
-	return false;
+	return ((typeof arg === 'undefined') || isStringArray(arg));
 }
 
 export class SemanticTokensBuilder {
@@ -2472,10 +2458,13 @@ export class SemanticTokensBuilder {
 		}
 	}
 
-	public push(line: number, char: number, length: number, tokenType: number, tokenModifiers: number): void;
+	public push(line: number, char: number, length: number, tokenType: number, tokenModifiers?: number): void;
 	public push(range: Range, tokenType: string, tokenModifiers?: string[]): void;
 	public push(arg0: any, arg1: any, arg2: any, arg3?: any, arg4?: any): void {
-		if (typeof arg0 === 'number' && typeof arg1 === 'number' && typeof arg2 === 'number' && typeof arg3 === 'number' && typeof arg4 === 'number') {
+		if (typeof arg0 === 'number' && typeof arg1 === 'number' && typeof arg2 === 'number' && typeof arg3 === 'number' && (typeof arg4 === 'number' || typeof arg4 === 'undefined')) {
+			if (typeof arg4 === 'undefined') {
+				arg4 = 0;
+			}
 			// 1st overload
 			return this._pushEncoded(arg0, arg1, arg2, arg3, arg4);
 		}
@@ -2734,98 +2723,3 @@ export class TimelineItem implements vscode.TimelineItem {
 }
 
 //#endregion Timeline
-
-//#region Custom Editors
-
-interface EditState {
-	readonly allEdits: readonly number[];
-	readonly currentIndex: number;
-	readonly saveIndex: number;
-}
-
-export class CustomDocument<EditType = unknown> implements vscode.CustomDocument<EditType> {
-
-	readonly #edits = new Cache<EditType>('edits');
-
-	readonly #viewType: string;
-	readonly #uri: vscode.Uri;
-
-	#editState: EditState = {
-		allEdits: [],
-		currentIndex: -1,
-		saveIndex: -1,
-	};
-	#isDisposed = false;
-	#version = 1;
-
-	constructor(viewType: string, uri: vscode.Uri) {
-		this.#viewType = viewType;
-		this.#uri = uri;
-	}
-
-	//#region Public API
-
-	public get viewType(): string { return this.#viewType; }
-
-	public get uri(): vscode.Uri { return this.#uri; }
-
-	public get fileName(): string { return this.uri.fsPath; }
-
-	public get isUntitled() { return this.uri.scheme === Schemas.untitled; }
-
-	#onDidDispose = new Emitter<void>();
-	public readonly onDidDispose = this.#onDidDispose.event;
-
-	public get isClosed() { return this.#isDisposed; }
-
-	public get version() { return this.#version; }
-
-	public get isDirty() {
-		return this.#editState.currentIndex !== this.#editState.saveIndex;
-	}
-
-	public get appliedEdits() {
-		return this.#editState.allEdits.slice(0, this.#editState.currentIndex + 1)
-			.map(id => this._getEdit(id));
-	}
-
-	public get savedEdits() {
-		return this.#editState.allEdits.slice(0, this.#editState.saveIndex + 1)
-			.map(id => this._getEdit(id));
-	}
-
-	//#endregion
-
-	/** @internal */ _dispose(): void {
-		this.#isDisposed = true;
-		this.#onDidDispose.fire();
-		this.#onDidDispose.dispose();
-	}
-
-	/** @internal */ _updateEditState(state: EditState) {
-		++this.#version;
-		this.#editState = state;
-	}
-
-	/** @internal*/ _getEdit(editId: number): EditType {
-		return assertIsDefined(this.#edits.get(editId, 0));
-	}
-
-	/** @internal*/ _disposeEdits(editIds: number[]) {
-		for (const editId of editIds) {
-			this.#edits.delete(editId);
-		}
-	}
-
-	/** @internal*/ _addEdit(edit: EditType): number {
-		const id = this.#edits.add([edit]);
-		this.#editState = {
-			allEdits: [...this.#editState.allEdits.slice(0, this.#editState.currentIndex), id],
-			currentIndex: this.#editState.currentIndex + 1,
-			saveIndex: this.#editState.saveIndex,
-		};
-		return id;
-	}
-}
-
-// #endregion

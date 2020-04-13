@@ -39,6 +39,7 @@ import 'vs/workbench/services/keybinding/electron-browser/keybinding.contributio
 import 'vs/workbench/services/extensions/electron-browser/extensionService';
 import 'vs/workbench/services/contextmenu/electron-browser/contextmenuService';
 import 'vs/workbench/services/extensionManagement/electron-browser/extensionManagementServerService';
+import 'vs/workbench/services/extensionManagement/electron-browser/extensionTipsService';
 import 'vs/workbench/services/remote/electron-browser/remoteAgentServiceImpl';
 import 'vs/workbench/services/telemetry/electron-browser/telemetryService';
 import 'vs/workbench/services/configurationResolver/electron-browser/configurationResolverService';
@@ -107,6 +108,9 @@ import 'vs/workbench/contrib/debug/electron-browser/extensionHostDebugService';
 // Webview
 import 'vs/workbench/contrib/webview/electron-browser/webview.contribution';
 
+// Notebook
+import 'vs/workbench/contrib/notebook/electron-browser/notebook.contribution';
+
 // Extensions Management
 import 'vs/workbench/contrib/extensions/electron-browser/extensions.contribution';
 
@@ -144,6 +148,6 @@ import 'vs/workbench/contrib/userDataSync/electron-browser/userDataSync.contribu
 import 'vs/workbench/contrib/welcome/telemetryOptOut/electron-browser/telemetryOptOut.contribution';
 
 // Configuration Exporter
-import 'vs/workbench/contrib/configExporter/node/configurationExportHelper.contribution';
+import 'vs/workbench/contrib/configExporter/electron-browser/configurationExportHelper.contribution';
 
 //#endregion

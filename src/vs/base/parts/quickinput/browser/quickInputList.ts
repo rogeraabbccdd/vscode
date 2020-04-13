@@ -25,7 +25,7 @@ import { Action } from 'vs/base/common/actions';
 import { getIconClass } from 'vs/base/parts/quickinput/browser/quickInputUtils';
 import { withNullAsUndefined } from 'vs/base/common/types';
 import { IQuickInputOptions } from 'vs/base/parts/quickinput/browser/quickInput';
-import { IListOptions, List, IListStyles, IAccessibilityProvider } from 'vs/base/browser/ui/list/listWidget';
+import { IListOptions, List, IListStyles, IListAccessibilityProvider } from 'vs/base/browser/ui/list/listWidget';
 import { KeybindingLabel } from 'vs/base/browser/ui/keybindingLabel/keybindingLabel';
 
 const $ = dom.$;
@@ -45,7 +45,7 @@ interface IListElement {
 	readonly fireButtonTriggered: (event: IQuickPickItemButtonEvent<IQuickPickItem>) => void;
 }
 
-class ListElement implements IListElement {
+class ListElement implements IListElement, IDisposable {
 	index!: number;
 	item!: IQuickPickItem;
 	saneLabel!: string;
@@ -73,6 +73,10 @@ class ListElement implements IListElement {
 
 	constructor(init: IListElement) {
 		assign(this, init);
+	}
+
+	dispose() {
+		this._onChecked.dispose();
 	}
 }
 
@@ -281,11 +285,6 @@ export class QuickInputList {
 			multipleSelectionSupport: false,
 			horizontalScrolling: false,
 			accessibilityProvider,
-			ariaProvider: {
-				getRole: () => 'option',
-				getSetSize: (_: ListElement, _index: number, listLength: number) => listLength,
-				getPosInSet: (_: ListElement, index: number) => index
-			},
 			ariaRole: 'listbox'
 		} as IListOptions<ListElement>);
 		this.list.getHTMLElement().id = id;
@@ -302,14 +301,12 @@ export class QuickInputList {
 					}
 					break;
 				case KeyCode.UpArrow:
-				case KeyCode.PageUp:
 					const focus1 = this.list.getFocus();
 					if (focus1.length === 1 && focus1[0] === 0) {
 						this._onLeave.fire();
 					}
 					break;
 				case KeyCode.DownArrow:
-				case KeyCode.PageDown:
 					const focus2 = this.list.getFocus();
 					if (focus2.length === 1 && focus2[0] === this.list.length - 1) {
 						this._onLeave.fire();
@@ -343,6 +340,14 @@ export class QuickInputList {
 				this.list.setSelection([e.index]);
 			}
 		}));
+		this.disposables.push(
+			this._onChangedAllVisibleChecked,
+			this._onChangedCheckedCount,
+			this._onChangedVisibleCount,
+			this._onChangedCheckedElements,
+			this._onButtonTriggered,
+			this._onLeave,
+		);
 	}
 
 	@memoize
@@ -441,6 +446,7 @@ export class QuickInputList {
 			}
 			return result;
 		}, [] as ListElement[]);
+		this.elementDisposables.push(...this.elements);
 		this.elementDisposables.push(...this.elements.map(element => element.onChecked(() => this.fireCheckedEvents())));
 
 		this.elementsToIndexes = this.elements.reduce((map, element, index) => {
@@ -518,11 +524,11 @@ export class QuickInputList {
 			return;
 		}
 
-		if ((what === QuickInputListFocus.Next || what === QuickInputListFocus.NextPage) && this.list.getFocus()[0] === this.list.length - 1) {
+		if (what === QuickInputListFocus.Next && this.list.getFocus()[0] === this.list.length - 1) {
 			what = QuickInputListFocus.First;
 		}
 
-		if ((what === QuickInputListFocus.Previous || what === QuickInputListFocus.PreviousPage) && this.list.getFocus()[0] === 0) {
+		if (what === QuickInputListFocus.Previous && this.list.getFocus()[0] === 0) {
 			what = QuickInputListFocus.Last;
 		}
 
@@ -694,11 +700,20 @@ function compareEntries(elementA: ListElement, elementB: ListElement, lookFor: s
 		return 1;
 	}
 
+	if (labelHighlightsA.length === 0 && labelHighlightsB.length === 0) {
+		return 0;
+	}
+
 	return compareAnything(elementA.saneLabel, elementB.saneLabel, lookFor);
 }
 
-class QuickInputAccessibilityProvider implements IAccessibilityProvider<ListElement> {
+class QuickInputAccessibilityProvider implements IListAccessibilityProvider<ListElement> {
+
 	getAriaLabel(element: ListElement): string | null {
 		return element.saneAriaLabel;
+	}
+
+	getRole() {
+		return 'option';
 	}
 }

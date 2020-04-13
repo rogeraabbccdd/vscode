@@ -36,11 +36,18 @@ export const NOTEBOOK_DISPLAY_ORDER = [
 	'text/plain'
 ];
 
+export const notebookDocumentMetadataDefaults: NotebookDocumentMetadata = {
+	editable: true,
+	cellEditable: true,
+	cellRunnable: true,
+	hasExecutionOrder: true
+};
+
 export interface NotebookDocumentMetadata {
 	editable: boolean;
-	cellEditable?: boolean;
-	cellRunnable?: boolean;
-	hasExecutionOrder?: boolean;
+	cellEditable: boolean;
+	cellRunnable: boolean;
+	hasExecutionOrder: boolean;
 }
 
 export interface NotebookCellMetadata {
@@ -242,7 +249,7 @@ export namespace CellUri {
 
 	export function generate(notebook: URI, handle: number): URI {
 		return notebook.with({
-			path: `${notebook.path}#cell-${handle}`,
+			path: `${notebook.path}, cell ${handle + 1}`,
 			query: JSON.stringify({ cell: handle, notebook: notebook.toString() }),
 			scheme,
 		});
