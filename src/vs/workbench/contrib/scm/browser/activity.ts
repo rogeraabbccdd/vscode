@@ -160,7 +160,7 @@ export class SCMStatusController implements IWorkbenchContribution {
 
 			disposables.add(this.statusbarService.addEntry({
 				text: c.title,
-				ariaLabel: tooltip,
+				ariaLabel: c.tooltip || label,
 				tooltip,
 				command: c
 			}, 'status.scm', localize('status.scm', "Source Control"), MainThreadStatusBarAlignment.LEFT, 10000));
@@ -184,7 +184,7 @@ export class SCMStatusController implements IWorkbenchContribution {
 
 		if (count > 0) {
 			const badge = new NumberBadge(count, num => localize('scmPendingChangesBadge', '{0} pending changes', num));
-			this.badgeDisposable.value = this.activityService.showActivity(VIEWLET_ID, badge, 'scm-viewlet-label');
+			this.badgeDisposable.value = this.activityService.showViewContainerActivity(VIEWLET_ID, { badge, clazz: 'scm-viewlet-label' });
 		} else {
 			this.badgeDisposable.clear();
 		}

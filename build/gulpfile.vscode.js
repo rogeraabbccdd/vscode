@@ -65,7 +65,7 @@ const vscodeResources = [
 	'out-build/vs/base/common/performance.js',
 	'out-build/vs/base/node/languagePacks.js',
 	'out-build/vs/base/node/{stdForkStart.js,terminateProcess.sh,cpuUsage.sh,ps.sh}',
-	'out-build/vs/base/browser/ui/codiconLabel/codicon/**',
+	'out-build/vs/base/browser/ui/codicons/codicon/**',
 	'out-build/vs/workbench/browser/media/*-theme.css',
 	'out-build/vs/workbench/contrib/debug/**/*.json',
 	'out-build/vs/workbench/contrib/fonts/**',
@@ -157,6 +157,7 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
 		const checksums = computeChecksums(out, [
 			'vs/workbench/workbench.desktop.main.js',
 			'vs/workbench/workbench.desktop.main.css',
+			'vs/workbench/services/extensions/node/extensionHostProcess.js',
 			'vs/code/electron-browser/workbench/workbench.html',
 			'vs/code/electron-browser/workbench/workbench.js'
 		]);
@@ -211,7 +212,7 @@ function packageTask(platform, arch, sourceFolderName, destinationFolderName, op
 		const deps = gulp.src(dependenciesSrc, { base: '.', dot: true })
 			.pipe(filter(['**', '!**/package-lock.json']))
 			.pipe(util.cleanNodeModules(path.join(__dirname, '.nativeignore')))
-			.pipe(createAsar(path.join(process.cwd(), 'node_modules'), ['**/*.node', '**/vscode-ripgrep/bin/*', '**/node-pty/build/Release/*'], 'app/node_modules.asar'));
+			.pipe(createAsar(path.join(process.cwd(), 'node_modules'), ['**/*.node', '**/vscode-ripgrep/bin/*', '**/node-pty/build/Release/*', '**/*.wasm'], 'app/node_modules.asar'));
 
 		let all = es.merge(
 			packageJsonStream,
@@ -324,6 +325,7 @@ const buildRoot = path.dirname(root);
 const BUILD_TARGETS = [
 	{ platform: 'win32', arch: 'ia32' },
 	{ platform: 'win32', arch: 'x64' },
+	{ platform: 'win32', arch: 'arm64' },
 	{ platform: 'darwin', arch: null, opts: { stats: true } },
 	{ platform: 'linux', arch: 'ia32' },
 	{ platform: 'linux', arch: 'x64' },
