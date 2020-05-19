@@ -7,6 +7,7 @@ import { isMacintosh, isLinux, isWeb } from 'vs/base/common/platform';
 import { IEnvironmentService } from 'vs/platform/environment/common/environment';
 import { URI, UriComponents } from 'vs/base/common/uri';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
+import { ThemeType } from 'vs/platform/theme/common/themeService';
 
 export interface IBaseOpenWindowsOptions {
 	forceReuseWindow?: boolean;
@@ -160,6 +161,7 @@ export interface IWindowConfiguration {
 	remoteAuthority?: string;
 
 	highContrast?: boolean;
+	defaultThemeType?: ThemeType;
 
 	filesToOpenOrCreate?: IPath[];
 	filesToDiff?: IPath[];

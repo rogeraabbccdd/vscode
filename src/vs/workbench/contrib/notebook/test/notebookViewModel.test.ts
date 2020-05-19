@@ -15,6 +15,7 @@ import { NotebookTextModel } from 'vs/workbench/contrib/notebook/common/model/no
 import { NotebookEventDispatcher } from 'vs/workbench/contrib/notebook/browser/viewModel/eventDispatcher';
 import { TrackedRangeStickiness } from 'vs/editor/common/model';
 import { reduceCellRanges, ICellRange } from 'vs/workbench/contrib/notebook/browser/notebookBrowser';
+import { generateUuid } from 'vs/base/common/uuid';
 
 suite('NotebookViewModel', () => {
 	const instantiationService = new TestInstantiationService();
@@ -23,7 +24,7 @@ suite('NotebookViewModel', () => {
 	instantiationService.spy(IUndoRedoService, 'pushElement');
 
 	test('ctor', function () {
-		const notebook = new NotebookTextModel(0, 'notebook', URI.parse('test'));
+		const notebook = new NotebookTextModel(0, 'notebook', URI.parse('test'), generateUuid());
 		const model = new NotebookEditorTestModel(notebook);
 		const eventDispatcher = new NotebookEventDispatcher();
 		const viewModel = new NotebookViewModel('notebook', model.notebook, eventDispatcher, null, instantiationService, blukEditService, undoRedoService);
@@ -156,11 +157,7 @@ suite('NotebookViewModel', () => {
 			(editor, viewModel) => {
 				viewModel.notebookDocument.metadata = { editable: true, runnable: true, cellRunnable: true, cellEditable: true, hasExecutionOrder: true };
 
-				const defaults = {
-					runState: undefined,
-					statusMessage: undefined,
-					executionOrder: undefined
-				};
+				const defaults = {};
 
 				assert.deepEqual(viewModel.viewCells[0].getEvaluatedMetadata(viewModel.metadata), <NotebookCellMetadata>{
 					editable: true,

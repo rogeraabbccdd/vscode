@@ -44,7 +44,7 @@ suite('NotebookConcatDocument', function () {
 		});
 		extHostDocumentsAndEditors = new ExtHostDocumentsAndEditors(rpcProtocol, new NullLogService());
 		extHostDocuments = new ExtHostDocuments(rpcProtocol, extHostDocumentsAndEditors);
-		extHostNotebooks = new ExtHostNotebookController(rpcProtocol, new ExtHostCommands(rpcProtocol, new NullLogService()), extHostDocumentsAndEditors);
+		extHostNotebooks = new ExtHostNotebookController(rpcProtocol, new ExtHostCommands(rpcProtocol, new NullLogService()), extHostDocumentsAndEditors, { isExtensionDevelopmentDebug: false, webviewCspSource: '', webviewResourceRoot: '' });
 		let reg = extHostNotebooks.registerNotebookContentProvider(nullExtensionDescription, 'test', new class extends mock<vscode.NotebookContentProvider>() {
 			// async openNotebook() { }
 		});
@@ -52,20 +52,18 @@ suite('NotebookConcatDocument', function () {
 			addedDocuments: [{
 				handle: 0,
 				uri: notebookUri,
-				viewType: 'test'
+				viewType: 'test',
+				webviewId: 'testid',
+				cells: [{
+					handle: 0,
+					uri: CellUri.generate(notebookUri, 0),
+					source: ['### Heading'],
+					language: 'markdown',
+					cellKind: CellKind.Markdown,
+					outputs: [],
+				}],
+				versionId: 0
 			}]
-		});
-		extHostNotebooks.$acceptModelChanged(notebookUri, {
-			kind: NotebookCellsChangeType.ModelChange,
-			versionId: 0,
-			changes: [[0, 0, [{
-				handle: 0,
-				uri: CellUri.generate(notebookUri, 0),
-				source: ['### Heading'],
-				language: 'markdown',
-				cellKind: CellKind.Markdown,
-				outputs: [],
-			}]]]
 		});
 		await extHostNotebooks.$acceptDocumentAndEditorsDelta({ newActiveEditor: notebookUri });
 

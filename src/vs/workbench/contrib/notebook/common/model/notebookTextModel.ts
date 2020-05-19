@@ -62,7 +62,8 @@ export class NotebookTextModelSnapshot implements ITextSnapshot {
 }
 
 export class NotebookTextModel extends Disposable implements INotebookTextModel {
-	private static _cellhandlePool: number = 0;
+
+	private _cellhandlePool: number = 0;
 
 	private readonly _onWillDispose: Emitter<void> = this._register(new Emitter<void>());
 	readonly onWillDispose: Event<void> = this._onWillDispose.event;
@@ -103,7 +104,8 @@ export class NotebookTextModel extends Disposable implements INotebookTextModel 
 	constructor(
 		public handle: number,
 		public viewType: string,
-		public uri: URI
+		public uri: URI,
+		public webviewId: string
 	) {
 		super();
 		this.cells = [];
@@ -116,7 +118,7 @@ export class NotebookTextModel extends Disposable implements INotebookTextModel 
 		outputs: IOutput[],
 		metadata: NotebookCellMetadata | undefined
 	) {
-		const cellHandle = NotebookTextModel._cellhandlePool++;
+		const cellHandle = this._cellhandlePool++;
 		const cellUri = CellUri.generate(this.uri, cellHandle);
 		return new NotebookCellTextModel(cellUri, cellHandle, source, language, cellKind, outputs || [], metadata);
 	}
@@ -126,7 +128,7 @@ export class NotebookTextModel extends Disposable implements INotebookTextModel 
 		this._versionId = 0;
 
 		const mainCells = cells.map(cell => {
-			const cellHandle = NotebookTextModel._cellhandlePool++;
+			const cellHandle = this._cellhandlePool++;
 			const cellUri = CellUri.generate(this.uri, cellHandle);
 			return new NotebookCellTextModel(cellUri, cellHandle, cell.source, cell.language, cell.cellKind, cell.outputs || [], cell.metadata);
 		});
@@ -176,7 +178,7 @@ export class NotebookTextModel extends Disposable implements INotebookTextModel 
 				case CellEditType.Insert:
 					const insertEdit = operations[i] as ICellInsertEdit;
 					const mainCells = insertEdit.cells.map(cell => {
-						const cellHandle = NotebookTextModel._cellhandlePool++;
+						const cellHandle = this._cellhandlePool++;
 						const cellUri = CellUri.generate(this.uri, cellHandle);
 						return new NotebookCellTextModel(cellUri, cellHandle, cell.source, cell.language, cell.cellKind, cell.outputs || [], cell.metadata);
 					});

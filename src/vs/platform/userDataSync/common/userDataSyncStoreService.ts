@@ -15,9 +15,16 @@ import { IProductService } from 'vs/platform/product/common/productService';
 import { getServiceMachineId } from 'vs/platform/serviceMachineId/common/serviceMachineId';
 import { IEnvironmentService } from 'vs/platform/environment/common/environment';
 import { IFileService } from 'vs/platform/files/common/files';
-import { IStorageService } from 'vs/platform/storage/common/storage';
+import { IStorageService, StorageScope } from 'vs/platform/storage/common/storage';
 import { assign } from 'vs/base/common/objects';
+import { generateUuid } from 'vs/base/common/uuid';
+import { isWeb } from 'vs/base/common/platform';
+import { ITelemetryService } from 'vs/platform/telemetry/common/telemetry';
 
+const USER_SESSION_ID_KEY = 'sync.user-session-id';
+const MACHINE_SESSION_ID_KEY = 'sync.machine-session-id';
+const REQUEST_SESSION_LIMIT = 100;
+const REQUEST_SESSION_INTERVAL = 1000 * 60 * 5; /* 5 minutes */
 
 export class UserDataSyncStoreService extends Disposable implements IUserDataSyncStoreService {
 
@@ -25,6 +32,7 @@ export class UserDataSyncStoreService extends Disposable implements IUserDataSyn
 
 	readonly userDataSyncStore: IUserDataSyncStore | undefined;
 	private readonly commonHeadersPromise: Promise<{ [key: string]: string; }>;
+	private readonly session: RequestsSession;
 
 	constructor(
 		@IProductService productService: IProductService,
@@ -34,18 +42,26 @@ export class UserDataSyncStoreService extends Disposable implements IUserDataSyn
 		@IUserDataSyncLogService private readonly logService: IUserDataSyncLogService,
 		@IEnvironmentService environmentService: IEnvironmentService,
 		@IFileService fileService: IFileService,
-		@IStorageService storageService: IStorageService,
+		@IStorageService private readonly storageService: IStorageService,
+		@ITelemetryService telemetryService: ITelemetryService,
 	) {
 		super();
 		this.userDataSyncStore = getUserDataSyncStore(productService, configurationService);
 		this.commonHeadersPromise = getServiceMachineId(environmentService, fileService, storageService)
 			.then(uuid => {
 				const headers: IHeaders = {
-					'X-Sync-Client-Id': productService.version,
+					'X-Client-Name': `${productService.applicationName}${isWeb ? '-web' : ''}`,
+					'X-Client-Version': productService.version,
+					'X-Machine-Id': uuid
 				};
-				headers['X-Sync-Machine-Id'] = uuid;
+				if (productService.commit) {
+					headers['X-Client-Commit'] = productService.commit;
+				}
 				return headers;
 			});
+
+		/* A requests session that limits requests per sessions */
+		this.session = new RequestsSession(REQUEST_SESSION_LIMIT, REQUEST_SESSION_INTERVAL, this.requestService, telemetryService);
 	}
 
 	async getAllRefs(resource: SyncResource): Promise<IResourceRefHandle[]> {
@@ -169,7 +185,25 @@ export class UserDataSyncStoreService extends Disposable implements IUserDataSyn
 			throw new UserDataSyncStoreError('Server returned ' + context.res.statusCode, UserDataSyncErrorCode.Unknown);
 		}
 
-		return asJson(context);
+		const manifest = await asJson<IUserDataManifest>(context);
+		const currentSessionId = this.storageService.get(USER_SESSION_ID_KEY, StorageScope.GLOBAL);
+
+		if (currentSessionId && manifest && currentSessionId !== manifest.session) {
+			// Server session is different from client session so clear cached session.
+			this.clearSession();
+		}
+
+		if (manifest === null && currentSessionId) {
+			// server session is cleared so clear cached session.
+			this.clearSession();
+		}
+
+		if (manifest) {
+			// update session
+			this.storageService.store(USER_SESSION_ID_KEY, manifest.session, StorageScope.GLOBAL);
+		}
+
+		return manifest;
 	}
 
 	async clear(): Promise<void> {
@@ -185,10 +219,18 @@ export class UserDataSyncStoreService extends Disposable implements IUserDataSyn
 		if (!isSuccess(context)) {
 			throw new UserDataSyncStoreError('Server returned ' + context.res.statusCode, UserDataSyncErrorCode.Unknown);
 		}
+
+		// clear cached session.
+		this.clearSession();
+	}
+
+	private clearSession(): void {
+		this.storageService.remove(USER_SESSION_ID_KEY, StorageScope.GLOBAL);
+		this.storageService.remove(MACHINE_SESSION_ID_KEY, StorageScope.GLOBAL);
 	}
 
 	private async request(options: IRequestOptions, source: SyncResource | undefined, token: CancellationToken): Promise<IRequestContext> {
-		const authToken = await this.authTokenService.getToken();
+		const authToken = this.authTokenService.token;
 		if (!authToken) {
 			throw new UserDataSyncStoreError('No Auth Token Available', UserDataSyncErrorCode.Unauthorized, source);
 		}
@@ -199,14 +241,20 @@ export class UserDataSyncStoreService extends Disposable implements IUserDataSyn
 			'authorization': `Bearer ${authToken.token}`,
 		});
 
+		// Add session headers
+		this.addSessionHeaders(options.headers);
+
 		this.logService.trace('Sending request to server', { url: options.url, type: options.type, headers: { ...options.headers, ...{ authorization: undefined } } });
 
 		let context;
 		try {
-			context = await this.requestService.request(options, token);
+			context = await this.session.request(options, token);
 			this.logService.trace('Request finished', { url: options.url, status: context.res.statusCode });
 		} catch (e) {
-			throw new UserDataSyncStoreError(`Connection refused for the request '${options.url?.toString()}'.`, UserDataSyncErrorCode.ConnectionRefused, source);
+			if (!(e instanceof UserDataSyncStoreError)) {
+				e = new UserDataSyncStoreError(`Connection refused for the request '${options.url?.toString()}'.`, UserDataSyncErrorCode.ConnectionRefused, source);
+			}
+			throw e;
 		}
 
 		if (context.res.statusCode === 401) {
@@ -226,7 +274,64 @@ export class UserDataSyncStoreService extends Disposable implements IUserDataSyn
 			throw new UserDataSyncStoreError(`${options.type} request '${options.url?.toString()}' failed because of too large payload (413).`, UserDataSyncErrorCode.TooLarge, source);
 		}
 
+		if (context.res.statusCode === 429) {
+			throw new UserDataSyncStoreError(`${options.type} request '${options.url?.toString()}' failed because of too many requests (429).`, UserDataSyncErrorCode.TooManyRequests, source);
+		}
+
 		return context;
+	}
+
+	private addSessionHeaders(headers: IHeaders): void {
+		let machineSessionId = this.storageService.get(MACHINE_SESSION_ID_KEY, StorageScope.GLOBAL);
+		if (machineSessionId === undefined) {
+			machineSessionId = generateUuid();
+			this.storageService.store(MACHINE_SESSION_ID_KEY, machineSessionId, StorageScope.GLOBAL);
+		}
+		headers['X-Machine-Session-Id'] = machineSessionId;
+
+		const userSessionId = this.storageService.get(USER_SESSION_ID_KEY, StorageScope.GLOBAL);
+		if (userSessionId !== undefined) {
+			headers['X-User-Session-Id'] = userSessionId;
+		}
+	}
+
+}
+
+export class RequestsSession {
+
+	private count: number = 0;
+	private startTime: Date | undefined = undefined;
+
+	constructor(
+		private readonly limit: number,
+		private readonly interval: number, /* in ms */
+		private readonly requestService: IRequestService,
+		private readonly telemetryService: ITelemetryService
+	) { }
+
+	request(options: IRequestOptions, token: CancellationToken): Promise<IRequestContext> {
+		if (this.isExpired()) {
+			this.reset();
+		}
+
+		if (this.count >= this.limit) {
+			this.telemetryService.publicLog2(`sync/error/${UserDataSyncErrorCode.LocalTooManyRequests}`);
+			throw new UserDataSyncStoreError(`Too many requests. Allowed only ${this.limit} requests in ${this.interval / (1000 * 60)} minutes.`, UserDataSyncErrorCode.LocalTooManyRequests);
+		}
+
+		this.startTime = this.startTime || new Date();
+		this.count++;
+
+		return this.requestService.request(options, token);
+	}
+
+	private isExpired(): boolean {
+		return this.startTime !== undefined && new Date().getTime() - this.startTime.getTime() > this.interval;
+	}
+
+	private reset(): void {
+		this.count = 0;
+		this.startTime = undefined;
 	}
 
 }

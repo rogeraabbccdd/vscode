@@ -22,6 +22,7 @@ import { IThemeService } from 'vs/platform/theme/common/themeService';
 import { CellRevealPosition, CellRevealType, CursorAtBoundary, getVisibleCells, ICellRange, ICellViewModel, INotebookCellList, reduceCellRanges, CellEditState } from 'vs/workbench/contrib/notebook/browser/notebookBrowser';
 import { CellViewModel, NotebookViewModel } from 'vs/workbench/contrib/notebook/browser/viewModel/notebookViewModel';
 import { diff, IOutput, NOTEBOOK_EDITOR_CURSOR_BOUNDARY, CellKind } from 'vs/workbench/contrib/notebook/common/notebookCommon';
+import { clamp } from 'vs/base/common/numbers';
 
 export class NotebookCellList extends WorkbenchList<CellViewModel> implements IDisposable, IStyleController, INotebookCellList {
 	get onWillScroll(): Event<ScrollEvent> { return this.view.onWillScroll; }
@@ -57,7 +58,6 @@ export class NotebookCellList extends WorkbenchList<CellViewModel> implements ID
 
 	) {
 		super(listUser, container, delegate, renderers, options, contextKeyService, listService, themeService, configurationService, keybindingService);
-
 		this._previousFocusedElements = this.getFocusedElements();
 		this._localDisposableStore.add(this.onDidChangeFocus((e) => {
 			this._previousFocusedElements.forEach(element => {
@@ -66,6 +66,19 @@ export class NotebookCellList extends WorkbenchList<CellViewModel> implements ID
 				}
 			});
 			this._previousFocusedElements = e.elements;
+
+			// if focus is in the list, but is not inside the focused element, then reset focus
+			setTimeout(() => {
+				if (DOM.isAncestor(document.activeElement, this.rowsContainer)) {
+					const focusedElement = this.getFocusedElements()[0];
+					if (focusedElement) {
+						const focusedDomElement = this.domElementOfElement(focusedElement);
+						if (focusedDomElement && !DOM.isAncestor(document.activeElement, focusedDomElement)) {
+							focusedDomElement.focus();
+						}
+					}
+				}
+			}, 0);
 		}));
 
 		const notebookEditorCursorAtBoundaryContext = NOTEBOOK_EDITOR_CURSOR_BOUNDARY.bindTo(contextKeyService);
@@ -120,6 +133,26 @@ export class NotebookCellList extends WorkbenchList<CellViewModel> implements ID
 			notebookEditorCursorAtBoundaryContext.set('none');
 		}));
 
+	}
+
+	elementAt(position: number): ICellViewModel | undefined {
+		if (!this.view.length) {
+			return undefined;
+		}
+
+		const idx = this.view.indexAt(position);
+		const clamped = clamp(idx, 0, this.view.length - 1);
+		return this.element(clamped);
+	}
+
+	elementHeight(element: ICellViewModel): number {
+		let index = this._getViewIndexUpperBound(element);
+		if (index === undefined || index < 0 || index >= this.length) {
+			this._getViewIndexUpperBound(element);
+			throw new ListError(this.listUser, `Invalid index ${index}`);
+		}
+
+		return this.view.elementHeight(index);
 	}
 
 	protected createMouseController(_options: IListOptions<CellViewModel>): MouseController<CellViewModel> {
@@ -324,7 +357,7 @@ export class NotebookCellList extends WorkbenchList<CellViewModel> implements ID
 			}
 		});
 
-		if (!selectionsLeft.length && this._viewModel!.viewCells) {
+		if (!selectionsLeft.length && this._viewModel!.viewCells.length) {
 			// after splice, the selected cells are deleted
 			this._viewModel!.selectionHandles = [this._viewModel!.viewCells[0].handle];
 		}
@@ -378,6 +411,10 @@ export class NotebookCellList extends WorkbenchList<CellViewModel> implements ID
 	}
 
 	setFocus(indexes: number[], browserEvent?: UIEvent): void {
+		if (!indexes.length) {
+			return;
+		}
+
 		if (this._viewModel) {
 			this._viewModel.selectionHandles = indexes.map(index => this.element(index)).map(cell => cell.handle);
 		}

@@ -19,9 +19,10 @@ import { URI } from 'vs/base/common/uri';
 import { SettingsSynchroniser } from 'vs/platform/userDataSync/common/settingsSync';
 import { isEqual } from 'vs/base/common/resources';
 import { SnippetsSynchroniser } from 'vs/platform/userDataSync/common/snippetsSync';
+import { Throttler } from 'vs/base/common/async';
 
-type SyncErrorClassification = {
-	source: { classification: 'SystemMetaData', purpose: 'FeatureInsight', isMeasurement: true };
+type SyncClassification = {
+	source?: { classification: 'SystemMetaData', purpose: 'FeatureInsight', isMeasurement: true };
 };
 
 const SESSION_ID_KEY = 'sync.sessionId';
@@ -31,6 +32,7 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 
 	_serviceBrand: any;
 
+	private readonly syncThrottler: Throttler;
 	private readonly synchronisers: IUserDataSynchroniser[];
 
 	private _status: SyncStatus = SyncStatus.Uninitialized;
@@ -68,6 +70,7 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 		@IStorageService private readonly storageService: IStorageService
 	) {
 		super();
+		this.syncThrottler = new Throttler();
 		this.settingsSynchroniser = this._register(this.instantiationService.createInstance(SettingsSynchroniser));
 		this.keybindingsSynchroniser = this._register(this.instantiationService.createInstance(KeybindingsSynchroniser));
 		this.snippetsSynchroniser = this._register(this.instantiationService.createInstance(SnippetsSynchroniser));
@@ -111,7 +114,10 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 
 	async sync(): Promise<void> {
 		await this.checkEnablement();
+		await this.syncThrottler.queue(() => this.doSync());
+	}
 
+	private async doSync(): Promise<void> {
 		const startTime = new Date().getTime();
 		this._syncErrors = [];
 		try {
@@ -120,6 +126,7 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 				this.setStatus(SyncStatus.Syncing);
 			}
 
+			this.telemetryService.publicLog2<{}, SyncClassification>('sync/getmanifest');
 			let manifest = await this.userDataSyncStoreService.manifest();
 
 			// Server has no data but this machine was synced before
@@ -136,7 +143,7 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 
 			for (const synchroniser of this.synchronisers) {
 				try {
-					await synchroniser.sync(manifest && manifest.latest ? manifest.latest[synchroniser.resource] : undefined);
+					await synchroniser.sync(manifest);
 				} catch (e) {
 					this.handleSyncError(e, synchroniser.resource);
 					this._syncErrors.push([synchroniser.resource, UserDataSyncError.toUserDataSyncError(e)]);
@@ -159,6 +166,15 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 		} finally {
 			this.updateStatus();
 			this._onSyncErrors.fire(this._syncErrors);
+		}
+	}
+
+	async replace(uri: URI): Promise<void> {
+		await this.checkEnablement();
+		for (const synchroniser of this.synchronisers) {
+			if (await synchroniser.replace(uri)) {
+				return;
+			}
 		}
 	}
 
@@ -326,7 +342,11 @@ export class UserDataSyncService extends Disposable implements IUserDataSyncServ
 		if (e instanceof UserDataSyncStoreError) {
 			switch (e.code) {
 				case UserDataSyncErrorCode.TooLarge:
-					this.telemetryService.publicLog2<{ source: string }, SyncErrorClassification>('sync/errorTooLarge', { source });
+					this.telemetryService.publicLog2<{ source: string }, SyncClassification>(`sync/error/${UserDataSyncErrorCode.TooLarge}`, { source });
+					break;
+				case UserDataSyncErrorCode.TooManyRequests:
+					this.telemetryService.publicLog2(`sync/error/${UserDataSyncErrorCode.TooManyRequests}`);
+					break;
 			}
 			throw e;
 		}
