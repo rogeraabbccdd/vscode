@@ -1,1 +1,1 @@
-import 'vs/css!./cascadiaCode';
+import "vs/css!./cascadiaCode";
