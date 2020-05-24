@@ -20,6 +20,7 @@ import { joinPath, dirname, basename, isEqual } from 'vs/base/common/resources';
 import { format } from 'vs/base/common/jsonFormatter';
 import { applyEdits } from 'vs/base/common/jsonEdit';
 import { compare } from 'vs/base/common/strings';
+import { IStorageService } from 'vs/platform/storage/common/storage';
 
 interface IExtensionsSyncPreviewResult extends ISyncPreviewResult {
 	readonly localExtensions: ISyncExtension[];
@@ -46,6 +47,7 @@ export class ExtensionsSynchroniser extends AbstractSynchroniser implements IUse
 	constructor(
 		@IEnvironmentService environmentService: IEnvironmentService,
 		@IFileService fileService: IFileService,
+		@IStorageService storageService: IStorageService,
 		@IUserDataSyncStoreService userDataSyncStoreService: IUserDataSyncStoreService,
 		@IUserDataSyncBackupStoreService userDataSyncBackupStoreService: IUserDataSyncBackupStoreService,
 		@IExtensionManagementService private readonly extensionManagementService: IExtensionManagementService,
@@ -56,7 +58,7 @@ export class ExtensionsSynchroniser extends AbstractSynchroniser implements IUse
 		@IUserDataSyncEnablementService userDataSyncEnablementService: IUserDataSyncEnablementService,
 		@ITelemetryService telemetryService: ITelemetryService,
 	) {
-		super(SyncResource.Extensions, fileService, environmentService, userDataSyncStoreService, userDataSyncBackupStoreService, userDataSyncEnablementService, telemetryService, logService, configurationService);
+		super(SyncResource.Extensions, fileService, environmentService, storageService, userDataSyncStoreService, userDataSyncBackupStoreService, userDataSyncEnablementService, telemetryService, logService, configurationService);
 		this._register(
 			Event.debounce(
 				Event.any<any>(
@@ -353,10 +355,10 @@ export class ExtensionsSynchroniser extends AbstractSynchroniser implements IUse
 
 	private parseExtensions(syncData: ISyncData): ISyncExtension[] {
 		let extensions: ISyncExtension[] = JSON.parse(syncData.content);
-		if (syncData.version !== this.version) {
+		if (syncData.version === 1) {
 			extensions = extensions.map(e => {
 				// #region Migration from v1 (enabled -> disabled)
-				if (!(<any>e).enabled) {
+				if ((<any>e).enabled === false) {
 					e.disabled = true;
 				}
 				delete (<any>e).enabled;
