@@ -26,7 +26,7 @@ import { IConfigurationService } from 'vs/platform/configuration/common/configur
 import * as perf from 'vs/base/common/performance';
 import { INativeWorkbenchEnvironmentService } from 'vs/workbench/services/environment/electron-browser/environmentService';
 import { assertIsDefined } from 'vs/base/common/types';
-import { IElectronService } from 'vs/platform/electron/electron-sandbox/electron';
+// import { IElectronService } from 'vs/platform/electron/electron-sandbox/electron';
 
 class PartsSplash {
 
@@ -46,7 +46,7 @@ class PartsSplash {
 		@ILifecycleService lifecycleService: ILifecycleService,
 		@IEditorGroupsService editorGroupsService: IEditorGroupsService,
 		@IConfigurationService configService: IConfigurationService,
-		@IElectronService private readonly _electronService: IElectronService
+		// @IElectronService private readonly _electronService: IElectronService
 	) {
 		lifecycleService.when(LifecyclePhase.Restored).then(_ => {
 			this._removePartsSplash();
