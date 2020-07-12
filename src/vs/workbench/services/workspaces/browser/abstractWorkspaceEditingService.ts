@@ -200,7 +200,11 @@ export abstract class AbstractWorkspaceEditingService implements IWorkspaceEditi
 		const remoteAuthority = this.environmentService.configuration.remoteAuthority;
 		const untitledWorkspace = await this.workspacesService.createUntitledWorkspace(folders, remoteAuthority);
 		if (path) {
-			await this.saveWorkspaceAs(untitledWorkspace, path);
+			try {
+				await this.saveWorkspaceAs(untitledWorkspace, path);
+			} finally {
+				await this.workspacesService.deleteUntitledWorkspace(untitledWorkspace); // https://github.com/microsoft/vscode/issues/100276
+			}
 		} else {
 			path = untitledWorkspace.configPath;
 		}
@@ -344,7 +348,7 @@ export abstract class AbstractWorkspaceEditingService implements IWorkspaceEditi
 			}
 		}
 
-		return this.jsonEditingService.write(toWorkspace.configPath, [{ key: 'settings', value: targetWorkspaceConfiguration }], true);
+		return this.jsonEditingService.write(toWorkspace.configPath, [{ path: ['settings'], value: targetWorkspaceConfiguration }], true);
 	}
 
 	protected getCurrentWorkspaceIdentifier(): IWorkspaceIdentifier | undefined {

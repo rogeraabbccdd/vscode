@@ -24,7 +24,6 @@ import { IProductService } from 'vs/platform/product/common/productService';
 interface IConfiguration extends IWindowsConfiguration {
 	update: { mode: string; };
 	telemetry: { enableCrashReporter: boolean };
-	workbench: { list: { horizontalScrolling: boolean } };
 	debug: { console: { wordWrap: boolean } };
 	editor: { accessibilitySupport: 'on' | 'off' | 'auto' };
 }
@@ -38,7 +37,6 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 	private clickThroughInactive: boolean | undefined;
 	private updateMode: string | undefined;
 	private enableCrashReporter: boolean | undefined;
-	private treeHorizontalScrolling: boolean | undefined;
 	private debugConsoleWordWrap: boolean | undefined;
 	private accessibilitySupport: 'on' | 'off' | 'auto' | undefined;
 
@@ -60,12 +58,6 @@ export class SettingsChangeRelauncher extends Disposable implements IWorkbenchCo
 		// Linux transparency
 		if (isLinux && config.window && typeof config.window.transparent === 'boolean' && config.window.transparent !== this.transparent) {
 			this.transparent = config.window.transparent;
-			changed = true;
-		}
-
-		// Tree horizontal scrolling support
-		if (typeof config.workbench?.list?.horizontalScrolling === 'boolean' && config.workbench.list.horizontalScrolling !== this.treeHorizontalScrolling) {
-			this.treeHorizontalScrolling = config.workbench.list.horizontalScrolling;
 			changed = true;
 		}
 

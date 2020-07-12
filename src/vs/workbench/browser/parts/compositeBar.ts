@@ -22,7 +22,7 @@ import { Emitter } from 'vs/base/common/event';
 import { ViewContainerLocation, IViewDescriptorService } from 'vs/workbench/common/views';
 import { IPaneComposite } from 'vs/workbench/common/panecomposite';
 import { IComposite } from 'vs/workbench/common/composite';
-import { CompositeDragAndDropData, CompositeDragAndDropObserver, IDraggedCompositeData, ICompositeDragAndDrop, Before2D } from 'vs/workbench/browser/dnd';
+import { CompositeDragAndDropData, CompositeDragAndDropObserver, IDraggedCompositeData, ICompositeDragAndDrop, Before2D, toggleDropEffect } from 'vs/workbench/browser/dnd';
 
 export interface ICompositeBarItem {
 	id: string;
@@ -122,8 +122,7 @@ export class CompositeDragAndDrop implements ICompositeDragAndDrop {
 			const draggedViews = this.viewDescriptorService.getViewContainerModel(currentContainer)!.allViewDescriptors;
 
 			// ... all views must be movable
-			// Prevent moving scm explicitly TODO@joaomoreno remove when scm is moveable
-			return !draggedViews.some(v => !v.canMoveView) && currentContainer.id !== 'workbench.view.scm';
+			return !draggedViews.some(v => !v.canMoveView);
 		} else {
 			// Dragging an individual view
 			const viewDescriptor = this.viewDescriptorService.getViewDescriptorById(dragData.id);
@@ -147,6 +146,7 @@ export interface ICompositeBarOptions {
 	readonly compositeSize: number;
 	readonly overflowActionSize: number;
 	readonly dndHandler: ICompositeDragAndDrop;
+	readonly preventLoopNavigation?: boolean;
 
 	getActivityAction: (compositeId: string) => ActivityAction;
 	getCompositePinnedAction: (compositeId: string) => Action;
@@ -226,46 +226,78 @@ export class CompositeBar extends Widget implements ICompositeBar {
 			orientation: this.options.orientation,
 			ariaLabel: nls.localize('activityBarAriaLabel', "Active View Switcher"),
 			animated: false,
+			preventLoopNavigation: this.options.preventLoopNavigation
 		}));
 
 		// Contextmenu for composites
 		this._register(addDisposableListener(parent, EventType.CONTEXT_MENU, e => this.showContextMenu(e)));
 
+		let insertDropBefore: Before2D | undefined = undefined;
 		// Register a drop target on the whole bar to prevent forbidden feedback
 		this._register(CompositeDragAndDropObserver.INSTANCE.registerTarget(parent, {
 			onDragOver: (e: IDraggedCompositeData) => {
 				// don't add feedback if this is over the composite bar actions or there are no actions
 				const visibleItems = this.getVisibleComposites();
 				if (!visibleItems.length || (e.eventData.target && isAncestor(e.eventData.target as HTMLElement, actionBarDiv))) {
-					toggleClass(parent, 'dragged-over', false);
+					insertDropBefore = this.updateFromDragging(parent, false, false);
 					return;
 				}
 
-				const validDropTarget = this.options.dndHandler.onDragOver(e.dragAndDropData, visibleItems[visibleItems.length - 1].id, e.eventData);
-				toggleClass(parent, 'dragged-over', validDropTarget);
+				const insertAtFront = this.insertAtFront(actionBarDiv, e.eventData);
+				const target = insertAtFront ? visibleItems[0] : visibleItems[visibleItems.length - 1];
+				const validDropTarget = this.options.dndHandler.onDragOver(e.dragAndDropData, target.id, e.eventData);
+				toggleDropEffect(e.eventData.dataTransfer, 'move', validDropTarget);
+				insertDropBefore = this.updateFromDragging(parent, validDropTarget, insertAtFront);
 			},
 
 			onDragLeave: (e: IDraggedCompositeData) => {
-				toggleClass(parent, 'dragged-over', false);
+				insertDropBefore = this.updateFromDragging(parent, false, false);
 			},
 			onDragEnd: (e: IDraggedCompositeData) => {
-				toggleClass(parent, 'dragged-over', false);
+				insertDropBefore = this.updateFromDragging(parent, false, false);
 			},
 			onDrop: (e: IDraggedCompositeData) => {
 				const visibleItems = this.getVisibleComposites();
 				if (visibleItems.length) {
-					this.options.dndHandler.drop(e.dragAndDropData, visibleItems[visibleItems.length - 1].id, e.eventData, { horizontallyBefore: false, verticallyBefore: false });
+					const target = this.insertAtFront(actionBarDiv, e.eventData) ? visibleItems[0] : visibleItems[visibleItems.length - 1];
+					this.options.dndHandler.drop(e.dragAndDropData, target.id, e.eventData, insertDropBefore);
 				}
-				toggleClass(parent, 'dragged-over', false);
+				insertDropBefore = this.updateFromDragging(parent, false, false);
 			}
 		}));
 
 		return actionBarDiv;
 	}
 
-	focus(): void {
+	private insertAtFront(element: HTMLElement, event: DragEvent): boolean {
+		const rect = element.getBoundingClientRect();
+		const posX = event.clientX;
+		const posY = event.clientY;
+
+		switch (this.options.orientation) {
+			case ActionsOrientation.HORIZONTAL:
+			case ActionsOrientation.HORIZONTAL_REVERSE:
+				return posX < rect.left;
+			case ActionsOrientation.VERTICAL:
+			case ActionsOrientation.VERTICAL_REVERSE:
+				return posY < rect.top;
+		}
+	}
+
+	private updateFromDragging(element: HTMLElement, showFeedback: boolean, front: boolean): Before2D | undefined {
+		toggleClass(element, 'dragged-over-head', showFeedback && front);
+		toggleClass(element, 'dragged-over-tail', showFeedback && !front);
+
+		if (!showFeedback) {
+			return undefined;
+		}
+
+		return { verticallyBefore: front, horizontallyBefore: front };
+	}
+
+	focus(index?: number): void {
 		if (this.compositeSwitcherBar) {
-			this.compositeSwitcherBar.focus();
+			this.compositeSwitcherBar.focus(index);
 		}
 	}
 
@@ -388,7 +420,7 @@ export class CompositeBar extends Widget implements ICompositeBar {
 
 		// Case: we closed the last visible composite
 		// Solv: we hide the part
-		else if (this.visibleComposites.length === 1) {
+		else if (this.visibleComposites.length === 0) {
 			this.options.hidePart();
 		}
 
