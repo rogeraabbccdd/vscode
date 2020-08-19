@@ -1135,7 +1135,8 @@ registerThemingParticipant((theme: IColorTheme, collector: ICssStyleCollector) =
 
 	const foregroundColor = theme.getColor(foreground);
 	if (foregroundColor) {
-		const whenForegroundColor = foregroundColor.transparent(.8).makeOpaque(WORKBENCH_BACKGROUND(theme));
+		const workbenchBackground = theme.getColor(WORKBENCH_BACKGROUND);
+		const whenForegroundColor = (workbenchBackground !== undefined) ? foregroundColor.transparent(.8).makeOpaque(workbenchBackground) : foregroundColor.transparent(.8).makeOpaque(foregroundColor.transparent(.8));
 		collector.addRule(`.keybindings-editor > .keybindings-body > .keybindings-list-container .monaco-list-row > .column > .code { color: ${whenForegroundColor}; }`);
 		const whenForegroundColorForOddRow = foregroundColor.transparent(.8).makeOpaque(oddRowBackgroundColor);
 		collector.addRule(`.keybindings-editor > .keybindings-body > .keybindings-list-container .monaco-list-row.odd > .column > .code { color: ${whenForegroundColorForOddRow}; }`);

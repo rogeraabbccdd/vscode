@@ -217,9 +217,10 @@ export class Renderer implements IPagedRenderer<IExtension, ITemplateData> {
 registerThemingParticipant((theme: IColorTheme, collector: ICssStyleCollector) => {
 	const foregroundColor = theme.getColor(foreground);
 	if (foregroundColor) {
-		const authorForeground = foregroundColor.transparent(.9).makeOpaque(WORKBENCH_BACKGROUND(theme));
+		const workbenchBackground = theme.getColor(WORKBENCH_BACKGROUND);
+		const authorForeground = (workbenchBackground !== undefined) ? foregroundColor.transparent(.9).makeOpaque(workbenchBackground) : foregroundColor.transparent(.9).makeOpaque(foregroundColor.transparent(.9));
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row:not(.disabled) .author { color: ${authorForeground}; }`);
-		const disabledExtensionForeground = foregroundColor.transparent(.5).makeOpaque(WORKBENCH_BACKGROUND(theme));
+		const disabledExtensionForeground = (workbenchBackground !== undefined) ? foregroundColor.transparent(.5).makeOpaque(workbenchBackground) : foregroundColor.transparent(.5).makeOpaque(foregroundColor.transparent(.5));
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row.disabled { color: ${disabledExtensionForeground}; }`);
 	}
 
