@@ -6,6 +6,7 @@
 import * as DOM from 'vs/base/browser/dom';
 import { CancellationToken } from 'vs/base/common/cancellation';
 import { Emitter } from 'vs/base/common/event';
+import { IRelativePattern } from 'vs/base/common/glob';
 import { combinedDisposable, Disposable, DisposableStore, IDisposable } from 'vs/base/common/lifecycle';
 import { ResourceMap } from 'vs/base/common/map';
 import { Schemas } from 'vs/base/common/network';
@@ -18,7 +19,7 @@ import { INotebookEditor } from 'vs/workbench/contrib/notebook/browser/notebookB
 import { NotebookCellTextModel } from 'vs/workbench/contrib/notebook/common/model/notebookCellTextModel';
 import { NotebookTextModel } from 'vs/workbench/contrib/notebook/common/model/notebookTextModel';
 import { INotebookCellStatusBarService } from 'vs/workbench/contrib/notebook/common/notebookCellStatusBarService';
-import { ACCESSIBLE_NOTEBOOK_DISPLAY_ORDER, CellEditType, DisplayOrderKey, ICellEditOperation, ICellRange, IEditor, IMainCellDto, INotebookDocumentFilter, NotebookCellOutputsSplice, NotebookCellsChangeType, NOTEBOOK_DISPLAY_ORDER, TransientMetadata } from 'vs/workbench/contrib/notebook/common/notebookCommon';
+import { ACCESSIBLE_NOTEBOOK_DISPLAY_ORDER, CellEditType, DisplayOrderKey, ICellEditOperation, ICellRange, IEditor, IMainCellDto, INotebookDecorationRenderOptions, INotebookDocumentFilter, INotebookExclusiveDocumentFilter, NotebookCellOutputsSplice, NotebookCellsChangeType, NOTEBOOK_DISPLAY_ORDER, TransientMetadata } from 'vs/workbench/contrib/notebook/common/notebookCommon';
 import { IMainNotebookController, INotebookService } from 'vs/workbench/contrib/notebook/common/notebookService';
 import { IEditorService } from 'vs/workbench/services/editor/common/editorService';
 import { IWorkingCopyService } from 'vs/workbench/services/workingCopy/common/workingCopyService';
@@ -104,6 +105,7 @@ class DocumentAndEditorState {
 						outputs: cell.outputs,
 						metadata: cell.metadata
 					})),
+					contentOptions: e.transientOptions,
 					// attachedEditor: editorId ? {
 					// 	id: editorId,
 					// 	selections: document.textModel.selections
@@ -162,7 +164,7 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 			return false;
 		}
 		this._notebookService.transformEditsOutputs(textModel, cellEdits);
-		return textModel.applyEdit(modelVersionId, cellEdits, true, undefined, () => undefined);
+		return textModel.applyEdits(modelVersionId, cellEdits, true, undefined, () => undefined);
 	}
 
 	private _isDeltaEmpty(delta: INotebookDocumentsAndEditorsDelta) {
@@ -443,15 +445,28 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 		// }
 	}
 
-	async $registerNotebookProvider(extension: NotebookExtensionDescription, viewType: string, supportBackup: boolean, options: { transientOutputs: boolean; transientMetadata: TransientMetadata }): Promise<void> {
+	async $registerNotebookProvider(extension: NotebookExtensionDescription, viewType: string, supportBackup: boolean, options: {
+		transientOutputs: boolean;
+		transientMetadata: TransientMetadata;
+		viewOptions?: { displayName: string; filenamePattern: (string | IRelativePattern | INotebookExclusiveDocumentFilter)[]; exclusive: boolean; };
+	}): Promise<void> {
+		let contentOptions = { transientOutputs: options.transientOutputs, transientMetadata: options.transientMetadata };
+
 		const controller: IMainNotebookController = {
 			supportBackup,
-			options,
+			get options() {
+				return contentOptions;
+			},
+			set options(newOptions) {
+				contentOptions.transientMetadata = newOptions.transientMetadata;
+				contentOptions.transientOutputs = newOptions.transientOutputs;
+			},
+			viewOptions: options.viewOptions,
 			reloadNotebook: async (mainthreadTextModel: NotebookTextModel) => {
 				const data = await this._proxy.$resolveNotebookData(viewType, mainthreadTextModel.uri);
 				mainthreadTextModel.updateLanguages(data.languages);
 				mainthreadTextModel.metadata = data.metadata;
-				mainthreadTextModel.transientOptions = options;
+				mainthreadTextModel.transientOptions = contentOptions;
 
 				const edits: ICellEditOperation[] = [
 					{ editType: CellEditType.Replace, index: 0, count: mainthreadTextModel.cells.length, cells: data.cells }
@@ -460,7 +475,7 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 				this._notebookService.transformEditsOutputs(mainthreadTextModel, edits);
 				await new Promise(resolve => {
 					DOM.scheduleAtNextAnimationFrame(() => {
-						const ret = mainthreadTextModel!.applyEdit(mainthreadTextModel!.versionId, edits, true, undefined, () => undefined);
+						const ret = mainthreadTextModel!.applyEdits(mainthreadTextModel!.versionId, edits, true, undefined, () => undefined);
 						resolve(ret);
 					});
 				});
@@ -469,7 +484,7 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 				const data = await this._proxy.$resolveNotebookData(viewType, uri, backupId);
 				return {
 					data,
-					transientOptions: options
+					transientOptions: contentOptions
 				};
 			},
 			resolveNotebookEditor: async (viewType: string, uri: URI, editorId: string) => {
@@ -492,6 +507,19 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 		const disposable = this._notebookService.registerNotebookController(viewType, extension, controller);
 		this._notebookProviders.set(viewType, { controller, disposable });
 		return;
+	}
+
+	async $updateNotebookProviderOptions(viewType: string, options?: { transientOutputs: boolean; transientMetadata: TransientMetadata; }): Promise<void> {
+		const provider = this._notebookProviders.get(viewType);
+
+		if (provider && options) {
+			provider.controller.options = options;
+			this._notebookService.listNotebookDocuments().forEach(document => {
+				if (document.viewType === viewType) {
+					document.transientOptions = provider.controller.options;
+				}
+			});
+		}
 	}
 
 	async $unregisterNotebookProvider(viewType: string): Promise<void> {
@@ -577,7 +605,7 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 			return;
 		}
 
-		textModel.applyEdit(textModel.versionId, [
+		textModel.applyEdits(textModel.versionId, [
 			{
 				editType: CellEditType.OutputsSplice,
 				index: textModel.cells.indexOf(cell),
@@ -614,7 +642,7 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 		const textModel = this._notebookService.getNotebookTextModel(URI.from(resource));
 
 		if (textModel) {
-			textModel.applyEdit(textModel.versionId, [
+			textModel.applyEdits(textModel.versionId, [
 				{
 					editType: CellEditType.Unknown
 				}
@@ -645,6 +673,22 @@ export class MainThreadNotebooks extends Disposable implements MainThreadNoteboo
 				default:
 					break;
 			}
+		}
+	}
+
+	$registerNotebookEditorDecorationType(key: string, options: INotebookDecorationRenderOptions) {
+		this._notebookService.registerEditorDecorationType(key, options);
+	}
+
+	$removeNotebookEditorDecorationType(key: string) {
+		this._notebookService.removeEditorDecorationType(key);
+	}
+
+	$trySetDecorations(id: string, range: ICellRange, key: string) {
+		const editor = this._notebookService.listNotebookEditors().find(editor => editor.getId() === id);
+		if (editor && editor.isNotebookEditor) {
+			const notebookEditor = editor as INotebookEditor;
+			notebookEditor.setEditorDecorations(key, range);
 		}
 	}
 

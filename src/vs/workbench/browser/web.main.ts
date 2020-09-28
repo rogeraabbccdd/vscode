@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { mark } from 'vs/base/common/performance';
-import { domContentLoaded, addDisposableListener, EventType, EventHelper } from 'vs/base/browser/dom';
+import { domContentLoaded, addDisposableListener, EventType, EventHelper, detectFullscreen, addDisposableThrottledListener } from 'vs/base/browser/dom';
 import { ServiceCollection } from 'vs/platform/instantiation/common/serviceCollection';
 import { ILogService, ConsoleLogService, MultiplexLogService } from 'vs/platform/log/common/log';
 import { ConsoleLogInAutomationService } from 'vs/platform/log/browser/log';
@@ -25,8 +25,8 @@ import { Schemas } from 'vs/base/common/network';
 import { IWorkspaceContextService } from 'vs/platform/workspace/common/workspace';
 import { IConfigurationService } from 'vs/platform/configuration/common/configuration';
 import { onUnexpectedError } from 'vs/base/common/errors';
-import * as browser from 'vs/base/browser/browser';
-import * as platform from 'vs/base/common/platform';
+import { setFullscreen } from 'vs/base/browser/browser';
+import { isIOS, isMacintosh } from 'vs/base/common/platform';
 import { URI } from 'vs/base/common/uri';
 import { IWorkspaceInitializationPayload } from 'vs/platform/workspaces/common/workspaces';
 import { WorkspaceService } from 'vs/workbench/services/configuration/browser/configurationService';
@@ -50,6 +50,7 @@ import { IndexedDB, INDEXEDDB_LOGS_OBJECT_STORE, INDEXEDDB_USERDATA_OBJECT_STORE
 import { BrowserRequestService } from 'vs/workbench/services/request/browser/requestService';
 import { IRequestService } from 'vs/platform/request/common/request';
 import { IUserDataInitializationService, UserDataInitializationService } from 'vs/workbench/services/userData/browser/userDataInit';
+import { UserDataSyncStoreManagementService } from 'vs/platform/userDataSync/common/userDataSyncStoreService';
 
 class BrowserMain extends Disposable {
 
@@ -58,6 +59,14 @@ class BrowserMain extends Disposable {
 		private readonly configuration: IWorkbenchConstructionOptions
 	) {
 		super();
+
+		this.init();
+	}
+
+	private init(): void {
+
+		// Browser config
+		setFullscreen(!!detectFullscreen());
 	}
 
 	async open(): Promise<IWorkbench> {
@@ -99,7 +108,7 @@ class BrowserMain extends Disposable {
 	private registerListeners(workbench: Workbench, storageService: BrowserStorageService): void {
 
 		// Layout
-		const viewport = platform.isIOS && (<any>window).visualViewport ? (<any>window).visualViewport /** Visual viewport */ : window /** Layout viewport */;
+		const viewport = isIOS && window.visualViewport ? window.visualViewport /** Visual viewport */ : window /** Layout viewport */;
 		this._register(addDisposableListener(viewport, EventType.RESIZE, () => workbench.layout()));
 
 		// Prevent the back/forward gestures in macOS
@@ -123,16 +132,15 @@ class BrowserMain extends Disposable {
 		}));
 		this._register(workbench.onShutdown(() => this.dispose()));
 
-		// Fullscreen
+		// Fullscreen (Browser)
 		[EventType.FULLSCREEN_CHANGE, EventType.WK_FULLSCREEN_CHANGE].forEach(event => {
-			this._register(addDisposableListener(document, event, () => {
-				if (document.fullscreenElement || (<any>document).webkitFullscreenElement || (<any>document).webkitIsFullScreen) {
-					browser.setFullscreen(true);
-				} else {
-					browser.setFullscreen(false);
-				}
-			}));
+			this._register(addDisposableListener(document, event, () => setFullscreen(!!detectFullscreen())));
 		});
+
+		// Fullscreen (Native)
+		this._register(addDisposableThrottledListener(viewport, EventType.RESIZE, () => {
+			setFullscreen(!!detectFullscreen());
+		}, undefined, isMacintosh ? 2000 /* adjust for macOS animation */ : 800 /* can be throttled */));
 	}
 
 	private async initServices(): Promise<{ serviceCollection: ServiceCollection, logService: ILogService, storageService: BrowserStorageService }> {
@@ -154,13 +162,13 @@ class BrowserMain extends Disposable {
 
 		const payload = await this.resolveWorkspaceInitializationPayload(resourceIdentityService);
 
-		// Environment
-		const environmentService = new BrowserWorkbenchEnvironmentService({ workspaceId: payload.id, logsPath, ...this.configuration });
-		serviceCollection.set(IWorkbenchEnvironmentService, environmentService);
-
 		// Product
 		const productService: IProductService = { _serviceBrand: undefined, ...product, ...this.configuration.productConfiguration };
 		serviceCollection.set(IProductService, productService);
+
+		// Environment
+		const environmentService = new BrowserWorkbenchEnvironmentService({ workspaceId: payload.id, logsPath, ...this.configuration }, productService);
+		serviceCollection.set(IWorkbenchEnvironmentService, environmentService);
 
 		// Remote
 		const remoteAuthorityResolverService = new RemoteAuthorityResolverService(this.configuration.resourceUriProvider);
@@ -205,8 +213,12 @@ class BrowserMain extends Disposable {
 		const requestService = new BrowserRequestService(remoteAgentService, configurationService, logService);
 		serviceCollection.set(IRequestService, requestService);
 
+		// Userdata Sync Store Management Service
+		const userDataSyncStoreManagementService = new UserDataSyncStoreManagementService(productService, configurationService, storageService);
+		serviceCollection.set(IRequestService, requestService);
+
 		// Userdata Initialize Service
-		const userDataInitializationService = new UserDataInitializationService(environmentService, fileService, storageService, productService, requestService, logService);
+		const userDataInitializationService = new UserDataInitializationService(environmentService, userDataSyncStoreManagementService, fileService, storageService, productService, requestService, logService);
 		serviceCollection.set(IUserDataInitializationService, userDataInitializationService);
 
 		if (await userDataInitializationService.requiresInitialization()) {
@@ -214,7 +226,7 @@ class BrowserMain extends Disposable {
 			// Initialize required resources - settings & global state
 			await userDataInitializationService.initializeRequiredResources();
 
-			// Important Reload only local user configuration after initializing
+			// Important: Reload only local user configuration after initializing
 			// Reloading complete configuraiton blocks workbench until remote configuration is loaded.
 			await configurationService.reloadLocalUserConfiguration();
 			mark('didInitRequiredUserData');
@@ -289,7 +301,7 @@ class BrowserMain extends Disposable {
 	}
 
 	private async createWorkspaceService(payload: IWorkspaceInitializationPayload, environmentService: IWorkbenchEnvironmentService, fileService: FileService, remoteAgentService: IRemoteAgentService, logService: ILogService): Promise<WorkspaceService> {
-		const workspaceService = new WorkspaceService({ remoteAuthority: this.configuration.remoteAuthority, configurationCache: new ConfigurationCache() }, environmentService, fileService, remoteAgentService);
+		const workspaceService = new WorkspaceService({ remoteAuthority: this.configuration.remoteAuthority, configurationCache: new ConfigurationCache() }, environmentService, fileService, remoteAgentService, logService);
 
 		try {
 			await workspaceService.initialize(payload);

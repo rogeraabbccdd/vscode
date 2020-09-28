@@ -32,10 +32,10 @@ import { addDisposableListener, EventType, EventHelper } from 'vs/base/browser/d
 import { IWorkspacesService } from 'vs/platform/workspaces/common/workspaces';
 import { Schemas } from 'vs/base/common/network';
 import { onUnexpectedError } from 'vs/base/common/errors';
-import { extUri } from 'vs/base/common/resources';
 import { IdleValue } from 'vs/base/common/async';
 import { ResourceGlobMatcher } from 'vs/workbench/common/resources';
 import { IPathService } from 'vs/workbench/services/path/common/pathService';
+import { IUriIdentityService } from 'vs/workbench/services/uriIdentity/common/uriIdentity';
 
 /**
  * Stores the selection & view state of an editor and allows to compare it to other selection states.
@@ -119,7 +119,8 @@ export class HistoryService extends Disposable implements IHistoryService {
 		@IInstantiationService private readonly instantiationService: IInstantiationService,
 		@IWorkbenchLayoutService private readonly layoutService: IWorkbenchLayoutService,
 		@IContextKeyService private readonly contextKeyService: IContextKeyService,
-		@IPathService private readonly pathService: IPathService
+		@IPathService private readonly pathService: IPathService,
+		@IUriIdentityService private readonly uriIdentityService: IUriIdentityService
 	) {
 		super();
 
@@ -136,7 +137,7 @@ export class HistoryService extends Disposable implements IHistoryService {
 
 		// if the service is created late enough that an editor is already opened
 		// make sure to trigger the onActiveEditorChanged() to track the editor
-		// properly (fixes https://github.com/Microsoft/vscode/issues/59908)
+		// properly (fixes https://github.com/microsoft/vscode/issues/59908)
 		if (this.editorService.activeEditorPane) {
 			this.onActiveEditorChanged();
 		}
@@ -581,7 +582,7 @@ export class HistoryService extends Disposable implements IHistoryService {
 		const resourceEditorInputA = arg1 as IResourceEditorInput;
 		const resourceEditorInputB = inputB as IResourceEditorInput;
 
-		return resourceEditorInputA && resourceEditorInputB && extUri.isEqual(resourceEditorInputA.resource, resourceEditorInputB.resource);
+		return resourceEditorInputA && resourceEditorInputB && this.uriIdentityService.extUri.isEqual(resourceEditorInputA.resource, resourceEditorInputB.resource);
 	}
 
 	private matchesFile(resource: URI, arg2: IEditorInput | IResourceEditorInput | FileChangesEvent): boolean {
@@ -596,15 +597,15 @@ export class HistoryService extends Disposable implements IHistoryService {
 			}
 
 			if (this.layoutService.isRestored() && !this.fileService.canHandleResource(inputResource)) {
-				return false; // make sure to only check this when workbench has restored (for https://github.com/Microsoft/vscode/issues/48275)
+				return false; // make sure to only check this when workbench has restored (for https://github.com/microsoft/vscode/issues/48275)
 			}
 
-			return extUri.isEqual(inputResource, resource);
+			return this.uriIdentityService.extUri.isEqual(inputResource, resource);
 		}
 
 		const resourceEditorInput = arg2 as IResourceEditorInput;
 
-		return extUri.isEqual(resourceEditorInput?.resource, resource);
+		return this.uriIdentityService.extUri.isEqual(resourceEditorInput?.resource, resource);
 	}
 
 	//#endregion
@@ -699,7 +700,7 @@ export class HistoryService extends Disposable implements IHistoryService {
 
 		// If no editor was opened, try with the next one
 		if (!editorPane) {
-			// Fix for https://github.com/Microsoft/vscode/issues/67882
+			// Fix for https://github.com/microsoft/vscode/issues/67882
 			// If opening of the editor fails, make sure to try the next one
 			// but make sure to remove this one from the list to prevent
 			// endless loops.
@@ -888,7 +889,7 @@ export class HistoryService extends Disposable implements IHistoryService {
 			try {
 				return this.safeLoadHistoryEntry(entry);
 			} catch (error) {
-				return undefined; // https://github.com/Microsoft/vscode/issues/60960
+				return undefined; // https://github.com/microsoft/vscode/issues/60960
 			}
 		}));
 	}
@@ -1001,7 +1002,7 @@ export class HistoryService extends Disposable implements IHistoryService {
 		for (const input of this.getHistory()) {
 			let resource: URI | undefined;
 			if (input instanceof EditorInput) {
-				resource = toResource(input, { filterByScheme });
+				resource = toResource(input, { filterByScheme, usePreferredResource: true });
 			} else {
 				resource = (input as IResourceEditorInput).resource;
 			}

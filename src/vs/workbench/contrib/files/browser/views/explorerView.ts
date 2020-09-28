@@ -588,10 +588,15 @@ export class ExplorerView extends ViewPane {
 		return this.tree.updateChildren(toRefresh, recursive);
 	}
 
-	focusNextIfItemFocused(item: ExplorerItem): void {
+	focusNeighbourIfItemFocused(item: ExplorerItem): void {
 		const focus = this.tree.getFocus();
 		if (focus.length === 1 && focus[0] === item) {
 			this.tree.focusNext();
+			const newFocus = this.tree.getFocus();
+			if (newFocus.length === 1 && newFocus[0] === item) {
+				// There was no next item to focus, focus the previous one
+				this.tree.focusPrevious();
+			}
 		}
 	}
 
@@ -675,7 +680,7 @@ export class ExplorerView extends ViewPane {
 		}
 
 		// check for files
-		return withNullAsUndefined(toResource(input, { supportSideBySide: SideBySideEditor.PRIMARY }));
+		return withNullAsUndefined(toResource(input, { supportSideBySide: SideBySideEditor.PRIMARY, usePreferredResource: true }));
 	}
 
 	public async selectResource(resource: URI | undefined, reveal = this.autoReveal, retry = 0): Promise<void> {
