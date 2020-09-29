@@ -945,7 +945,6 @@
 	"telemetryOptOutUrl": "https://go.microsoft.com/fwlink/?linkid=870136",
 	"npsSurveyUrl": "https://www.research.net/r/Z2RMYRJ",
 	"checksumFailMoreInfoUrl": "https://go.microsoft.com/fwlink/?LinkId=828886",
-	"electronRepository": "Microsoft/vscode-electron-prebuilt",
 	"settingsSearchUrl": "https://bingsettingssearch.trafficmanager.net/api/Search",
 	"surveys": [
 		{
