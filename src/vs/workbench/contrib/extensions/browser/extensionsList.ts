@@ -218,45 +218,45 @@ registerThemingParticipant((theme: IColorTheme, collector: ICssStyleCollector) =
 	const foregroundColor = theme.getColor(foreground);
 	if (foregroundColor) {
 		const workbenchBackground = theme.getColor(WORKBENCH_BACKGROUND);
-		const authorForeground = (workbenchBackground !== undefined) ? foregroundColor.transparent(.9).makeOpaque(workbenchBackground) : foregroundColor.transparent(.9).makeOpaque(foregroundColor.transparent(.9));
+		const authorForeground = workbenchBackground ? foregroundColor.transparent(.9).makeOpaque(workbenchBackground) : foregroundColor.transparent(.9).makeOpaque(foregroundColor.transparent(.9));
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row:not(.disabled) .author { color: ${authorForeground}; }`);
-		const disabledExtensionForeground = (workbenchBackground !== undefined) ? foregroundColor.transparent(.5).makeOpaque(workbenchBackground) : foregroundColor.transparent(.5).makeOpaque(foregroundColor.transparent(.5));
+		const disabledExtensionForeground = workbenchBackground ? foregroundColor.transparent(.5).makeOpaque(workbenchBackground) : foregroundColor.transparent(.5).makeOpaque(foregroundColor.transparent(.5));
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row.disabled { color: ${disabledExtensionForeground}; }`);
 	}
 
 	const listActiveSelectionForegroundColor = theme.getColor(listActiveSelectionForeground);
 	if (listActiveSelectionForegroundColor) {
-		const backgroundColor = theme.getColor(listActiveSelectionBackground) || WORKBENCH_BACKGROUND(theme);
-		const authorForeground = listActiveSelectionForegroundColor.transparent(.9).makeOpaque(backgroundColor);
+		const backgroundColor = theme.getColor(listActiveSelectionBackground) || theme.getColor(WORKBENCH_BACKGROUND);
+		const authorForeground = backgroundColor ? listActiveSelectionForegroundColor.transparent(.9).makeOpaque(backgroundColor) : listActiveSelectionForegroundColor.transparent(.9).makeOpaque(listActiveSelectionForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row:not(.disabled).focused.selected .author { color: ${authorForeground}; }`);
-		const disabledExtensionForeground = listActiveSelectionForegroundColor.transparent(.5).makeOpaque(backgroundColor);
+		const disabledExtensionForeground = backgroundColor ? listActiveSelectionForegroundColor.transparent(.5).makeOpaque(backgroundColor) : listActiveSelectionForegroundColor.transparent(.5).makeOpaque(listActiveSelectionForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row.disabled.focused.selected { color: ${disabledExtensionForeground}; }`);
 	}
 
 	const listInactiveSelectionForegroundColor = theme.getColor(listInactiveSelectionForeground);
 	if (listInactiveSelectionForegroundColor) {
-		const backgroundColor = theme.getColor(listInactiveSelectionBackground) || WORKBENCH_BACKGROUND(theme);
-		const authorForeground = listInactiveSelectionForegroundColor.transparent(.9).makeOpaque(backgroundColor);
+		const backgroundColor = theme.getColor(listInactiveSelectionBackground) || theme.getColor(WORKBENCH_BACKGROUND);
+		const authorForeground = backgroundColor ? listInactiveSelectionForegroundColor.transparent(.9).makeOpaque(backgroundColor) : listInactiveSelectionForegroundColor.transparent(.9).makeOpaque(listInactiveSelectionForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row:not(.disabled).selected .author { color: ${authorForeground}; }`);
-		const disabledExtensionForeground = listInactiveSelectionForegroundColor.transparent(.5).makeOpaque(backgroundColor);
+		const disabledExtensionForeground = backgroundColor ? listInactiveSelectionForegroundColor.transparent(.5).makeOpaque(backgroundColor) : listInactiveSelectionForegroundColor.transparent(.5).makeOpaque(listInactiveSelectionForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row.disabled.selected { color: ${disabledExtensionForeground}; }`);
 	}
 
 	const listFocusForegroundColor = theme.getColor(listFocusForeground);
 	if (listFocusForegroundColor) {
-		const backgroundColor = theme.getColor(listFocusBackground) || WORKBENCH_BACKGROUND(theme);
-		const authorForeground = listFocusForegroundColor.transparent(.9).makeOpaque(backgroundColor);
+		const backgroundColor = theme.getColor(listFocusBackground) || theme.getColor(WORKBENCH_BACKGROUND);
+		const authorForeground = backgroundColor ? listFocusForegroundColor.transparent(.9).makeOpaque(backgroundColor) : listFocusForegroundColor.transparent(.9).makeOpaque(listFocusForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row:not(.disabled).focused .author { color: ${authorForeground}; }`);
-		const disabledExtensionForeground = listFocusForegroundColor.transparent(.5).makeOpaque(backgroundColor);
+		const disabledExtensionForeground = backgroundColor ? listFocusForegroundColor.transparent(.5).makeOpaque(backgroundColor) : listFocusForegroundColor.transparent(.5).makeOpaque(listFocusForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row.disabled.focused { color: ${disabledExtensionForeground}; }`);
 	}
 
 	const listHoverForegroundColor = theme.getColor(listHoverForeground);
 	if (listHoverForegroundColor) {
-		const backgroundColor = theme.getColor(listHoverBackground) || WORKBENCH_BACKGROUND(theme);
-		const authorForeground = listHoverForegroundColor.transparent(.9).makeOpaque(backgroundColor);
+		const backgroundColor = theme.getColor(listHoverBackground) || theme.getColor(WORKBENCH_BACKGROUND);
+		const authorForeground = backgroundColor ? listHoverForegroundColor.transparent(.9).makeOpaque(backgroundColor) : listHoverForegroundColor.transparent(.9).makeOpaque(listHoverForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row:hover:not(.disabled):not(.selected):.not(.focused) .author { color: ${authorForeground}; }`);
-		const disabledExtensionForeground = listHoverForegroundColor.transparent(.5).makeOpaque(backgroundColor);
+		const disabledExtensionForeground = backgroundColor ? listHoverForegroundColor.transparent(.5).makeOpaque(backgroundColor) : listHoverForegroundColor.transparent(.5).makeOpaque(listHoverForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list .monaco-list-row.disabled:hover:not(.selected):.not(.focused) { color: ${disabledExtensionForeground}; }`);
 	}
 });
