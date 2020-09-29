@@ -23,8 +23,6 @@
 	"urlProtocol": "vscode",
 	"dataFolderName": ".vscode",
 	"serverDataFolderName": ".vscode-server",
-	"downloadUrl": "https://code.visualstudio.com",
-	"updateUrl": "https://update.code.visualstudio.com",
 	"quality": "stable",
 	"extensionsGallery": {
 		"serviceUrl": "https://marketplace.visualstudio.com/_apis/public/gallery",
