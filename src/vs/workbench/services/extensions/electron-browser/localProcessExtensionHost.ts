@@ -170,6 +170,12 @@ export class LocalProcessExtensionHost implements IExtensionHost {
 					delete env['DYLD_LIBRARY_PATH'];
 				}
 
+				if (this._isExtensionDevHost) {
+					// Unset `VSCODE_NODE_CACHED_DATA_DIR` when developing extensions because it might
+					// be that dependencies, that otherwise would be cached, get modified.
+					delete env['VSCODE_NODE_CACHED_DATA_DIR'];
+				}
+
 				const opts = {
 					env,
 					// We only detach the extension host on windows. Linux and Mac orphan by default
@@ -277,7 +283,7 @@ export class LocalProcessExtensionHost implements IExtensionHost {
 
 				// Help in case we fail to start it
 				let startupTimeoutHandle: any;
-				if (!this._environmentService.isBuilt && !this._environmentService.configuration.remoteAuthority || this._isExtensionDevHost) {
+				if (!this._environmentService.isBuilt && !this._environmentService.remoteAuthority || this._isExtensionDevHost) {
 					startupTimeoutHandle = setTimeout(() => {
 						const msg = this._isExtensionDevDebugBrk
 							? nls.localize('extensionHost.startupFailDebug', "Extension host did not start in 10 seconds, it might be stopped on the first line and needs a debugger to continue.")
@@ -465,7 +471,7 @@ export class LocalProcessExtensionHost implements IExtensionHost {
 				isUntitled: workspace.configuration ? isUntitledWorkspace(workspace.configuration, this._environmentService) : false
 			},
 			remote: {
-				authority: this._environmentService.configuration.remoteAuthority,
+				authority: this._environmentService.remoteAuthority,
 				connectionData: null,
 				isRemote: false
 			},

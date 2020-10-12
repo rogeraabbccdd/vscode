@@ -1706,7 +1706,7 @@ export class SettingsTreeFilter implements ITreeFilter<SettingsTreeElement> {
 
 		// Non-user scope selected
 		if (element instanceof SettingsTreeSettingElement && this.viewState.settingsTarget !== ConfigurationTarget.USER_LOCAL) {
-			const isRemote = !!this.environmentService.configuration.remoteAuthority;
+			const isRemote = !!this.environmentService.remoteAuthority;
 			if (!element.matchesScope(this.viewState.settingsTarget, isRemote)) {
 				return false;
 			}
@@ -1836,7 +1836,8 @@ class SettingsTreeAccessibilityProvider implements IListAccessibilityProvider<Se
 			const otherOverridesList = element.overriddenScopeList.join(', ');
 			const otherOverridesLabel = element.overriddenScopeList.length ? `${otherOverridesStart} ${otherOverridesList}. ` : '';
 
-			return `${element.displayCategory} ${element.displayLabel}. ${element.description}. ${modifiedText} ${otherOverridesLabel}`;
+			const descriptionWithoutSettingLinks = fixSettingLinks(element.description, false);
+			return `${element.displayCategory} ${element.displayLabel}. ${descriptionWithoutSettingLinks}. ${modifiedText} ${otherOverridesLabel}`;
 		} else {
 			return element.id;
 		}

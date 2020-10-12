@@ -68,6 +68,7 @@ export interface ITokenResponse {
 	refresh_token: string;
 	scope: string;
 	token_type: string;
+	id_token?: string;
 }
 
 function parseQuery(uri: vscode.Uri) {
@@ -99,7 +100,7 @@ export class AzureActiveDirectoryService {
 	}
 
 	public async initialize(): Promise<void> {
-		const storedData = await keychain.getToken();
+		const storedData = await keychain.getToken() || await keychain.tryMigrate();
 		if (storedData) {
 			try {
 				const sessions = this.parseStoredData(storedData);
@@ -139,7 +140,7 @@ export class AzureActiveDirectoryService {
 			}
 		}
 
-		this.pollForChange();
+		keychain.onDidChangePassword(() => this.checkForUpdates);
 	}
 
 	private parseStoredData(data: string): IStoredSession[] {
@@ -159,67 +160,63 @@ export class AzureActiveDirectoryService {
 		await keychain.setToken(JSON.stringify(serializedData));
 	}
 
-	private pollForChange() {
-		setTimeout(async () => {
-			const addedIds: string[] = [];
-			let removedIds: string[] = [];
-			const storedData = await keychain.getToken();
-			if (storedData) {
-				try {
-					const sessions = this.parseStoredData(storedData);
-					let promises = sessions.map(async session => {
-						const matchesExisting = this._tokens.some(token => token.scope === session.scope && token.sessionId === session.id);
-						if (!matchesExisting && session.refreshToken) {
-							try {
-								await this.refreshToken(session.refreshToken, session.scope, session.id);
-								addedIds.push(session.id);
-							} catch (e) {
-								if (e.message === REFRESH_NETWORK_FAILURE) {
-									// Ignore, will automatically retry on next poll.
-								} else {
-									await this.logout(session.id);
-								}
+	private async checkForUpdates(): Promise<void> {
+		const addedIds: string[] = [];
+		let removedIds: string[] = [];
+		const storedData = await keychain.getToken();
+		if (storedData) {
+			try {
+				const sessions = this.parseStoredData(storedData);
+				let promises = sessions.map(async session => {
+					const matchesExisting = this._tokens.some(token => token.scope === session.scope && token.sessionId === session.id);
+					if (!matchesExisting && session.refreshToken) {
+						try {
+							await this.refreshToken(session.refreshToken, session.scope, session.id);
+							addedIds.push(session.id);
+						} catch (e) {
+							if (e.message === REFRESH_NETWORK_FAILURE) {
+								// Ignore, will automatically retry on next poll.
+							} else {
+								await this.logout(session.id);
 							}
 						}
-					});
+					}
+				});
 
-					promises = promises.concat(this._tokens.map(async token => {
-						const matchesExisting = sessions.some(session => token.scope === session.scope && token.sessionId === session.id);
-						if (!matchesExisting) {
-							await this.logout(token.sessionId);
-							removedIds.push(token.sessionId);
-						}
-					}));
+				promises = promises.concat(this._tokens.map(async token => {
+					const matchesExisting = sessions.some(session => token.scope === session.scope && token.sessionId === session.id);
+					if (!matchesExisting) {
+						await this.logout(token.sessionId);
+						removedIds.push(token.sessionId);
+					}
+				}));
 
-					await Promise.all(promises);
-				} catch (e) {
-					Logger.error(e.message);
-					// if data is improperly formatted, remove all of it and send change event
-					removedIds = this._tokens.map(token => token.sessionId);
-					this.clearSessions();
-				}
-			} else {
-				if (this._tokens.length) {
-					// Log out all, remove all local data
-					removedIds = this._tokens.map(token => token.sessionId);
-					Logger.info('No stored keychain data, clearing local data');
-
-					this._tokens = [];
-
-					this._refreshTimeouts.forEach(timeout => {
-						clearTimeout(timeout);
-					});
-
-					this._refreshTimeouts.clear();
-				}
+				await Promise.all(promises);
+			} catch (e) {
+				Logger.error(e.message);
+				// if data is improperly formatted, remove all of it and send change event
+				removedIds = this._tokens.map(token => token.sessionId);
+				this.clearSessions();
 			}
+		} else {
+			if (this._tokens.length) {
+				// Log out all, remove all local data
+				removedIds = this._tokens.map(token => token.sessionId);
+				Logger.info('No stored keychain data, clearing local data');
 
-			if (addedIds.length || removedIds.length) {
-				onDidChangeSessions.fire({ added: addedIds, removed: removedIds, changed: [] });
+				this._tokens = [];
+
+				this._refreshTimeouts.forEach(timeout => {
+					clearTimeout(timeout);
+				});
+
+				this._refreshTimeouts.clear();
 			}
+		}
 
-			this.pollForChange();
-		}, 1000 * 30);
+		if (addedIds.length || removedIds.length) {
+			onDidChangeSessions.fire({ added: addedIds, removed: removedIds, changed: [] });
+		}
 	}
 
 	private async convertToSession(token: IToken): Promise<vscode.AuthenticationSession> {
@@ -449,7 +446,19 @@ export class AzureActiveDirectoryService {
 	}
 
 	private getTokenFromResponse(json: ITokenResponse, scope: string, existingId?: string): IToken {
-		const claims = this.getTokenClaims(json.access_token);
+		let claims = undefined;
+
+		try {
+			claims = this.getTokenClaims(json.access_token);
+		} catch (e) {
+			if (json.id_token) {
+				Logger.info('Failed to fetch token claims from access_token. Attempting to parse id_token instead');
+				claims = this.getTokenClaims(json.id_token);
+			} else {
+				throw e;
+			}
+		}
+
 		return {
 			expiresIn: json.expires_in,
 			expiresAt: json.expires_in ? Date.now() + json.expires_in * 1000 : undefined,

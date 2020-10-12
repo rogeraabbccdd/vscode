@@ -101,18 +101,6 @@ export class ExtensionService extends AbstractExtensionService implements IExten
 				this._initialize();
 			}, 50 /*max delay*/);
 		});
-
-		// delay notification for extensions disabled until workbench restored
-		if (this._extensionEnablementService.allUserExtensionsDisabled) {
-			this._lifecycleService.when(LifecyclePhase.Restored).then(() => {
-				this._notificationService.prompt(Severity.Info, nls.localize('extensionsDisabled', "All installed extensions are temporarily disabled. Reload the window to return to the previous state."), [{
-					label: nls.localize('Reload', "Reload"),
-					run: () => {
-						this._hostService.reload();
-					}
-				}]);
-			});
-		}
 	}
 
 	protected _scanSingleExtension(extension: IExtension): Promise<IExtensionDescription | null> {
@@ -174,7 +162,7 @@ export class ExtensionService extends AbstractExtensionService implements IExten
 				// workspace extensions run remotely if possible
 				return ExtensionRunningLocation.Remote;
 			}
-			if (extensionKind === 'workspace' && !this._environmentService.configuration.remoteAuthority) {
+			if (extensionKind === 'workspace' && !this._environmentService.remoteAuthority) {
 				// workspace extensions also run locally if there is no remote
 				return ExtensionRunningLocation.LocalProcess;
 			}
@@ -273,7 +261,7 @@ export class ExtensionService extends AbstractExtensionService implements IExten
 	}
 
 	private async _resolveAuthorityAgain(): Promise<void> {
-		const remoteAuthority = this._environmentService.configuration.remoteAuthority;
+		const remoteAuthority = this._environmentService.remoteAuthority;
 		if (!remoteAuthority) {
 			return;
 		}
@@ -291,7 +279,7 @@ export class ExtensionService extends AbstractExtensionService implements IExten
 	protected async _scanAndHandleExtensions(): Promise<void> {
 		this._extensionScanner.startScanningExtensions(this.createLogger());
 
-		const remoteAuthority = this._environmentService.configuration.remoteAuthority;
+		const remoteAuthority = this._environmentService.remoteAuthority;
 		const localProcessExtensionHost = this._getExtensionHostManager(ExtensionHostKind.LocalProcess)!;
 
 		const localExtensions = this._checkEnabledAndProposedAPI(await this._scanAllLocalExtensions());

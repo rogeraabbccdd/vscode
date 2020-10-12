@@ -229,8 +229,10 @@ registerThemingParticipant((theme: IColorTheme, collector: ICssStyleCollector) =
 		const backgroundColor = theme.getColor(listActiveSelectionBackground) || theme.getColor(WORKBENCH_BACKGROUND);
 		const authorForeground = backgroundColor ? listActiveSelectionForegroundColor.transparent(.9).makeOpaque(backgroundColor) : listActiveSelectionForegroundColor.transparent(.9).makeOpaque(listActiveSelectionForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row:not(.disabled).focused.selected .author { color: ${authorForeground}; }`);
+		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row:not(.disabled).selected .author { color: ${authorForeground}; }`);
 		const disabledExtensionForeground = backgroundColor ? listActiveSelectionForegroundColor.transparent(.5).makeOpaque(backgroundColor) : listActiveSelectionForegroundColor.transparent(.5).makeOpaque(listActiveSelectionForegroundColor);
 		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row.disabled.focused.selected { color: ${disabledExtensionForeground}; }`);
+		collector.addRule(`.extensions-list .monaco-list:focus .monaco-list-row.disabled.selected { color: ${disabledExtensionForeground}; }`);
 	}
 
 	const listInactiveSelectionForegroundColor = theme.getColor(listInactiveSelectionForeground);

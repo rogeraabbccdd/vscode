@@ -153,7 +153,6 @@ enum ColorScheme {
 	HIGH_CONTRAST = 'hc'
 }
 
-
 interface IInitialColorTheme {
 
 	/**
@@ -313,12 +312,6 @@ interface IWorkbenchConstructionOptions {
 	 * A handler for opening workspaces and providing the initial workspace.
 	 */
 	readonly workspaceProvider?: IWorkspaceProvider;
-
-	/**
-	 * The user data provider is used to handle user specific application
-	 * state like settings, keybindings, UI state (e.g. opened editors) and snippets.
-	 */
-	userDataProvider?: IFileSystemProvider;
 
 	/**
 	 * Enables Settings Sync by default.

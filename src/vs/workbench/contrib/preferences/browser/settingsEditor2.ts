@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as DOM from 'vs/base/browser/dom';
+import * as aria from 'vs/base/browser/ui/aria/aria';
 import { StandardKeyboardEvent } from 'vs/base/browser/keyboardEvent';
 import { ActionBar } from 'vs/base/browser/ui/actionbar/actionbar';
 import { Button } from 'vs/base/browser/ui/button/button';
@@ -139,6 +140,8 @@ export class SettingsEditor2 extends EditorPane {
 
 	private readonly viewState: ISettingsEditorViewState;
 	private _searchResultModel: SearchResultModel | null = null;
+	private searchResultLabel: string | null = null;
+	private lastSyncedLabel: string | null = null;
 
 	private tocRowFocused: IContextKey<boolean>;
 	private settingRowFocused: IContextKey<boolean>;
@@ -418,10 +421,16 @@ export class SettingsEditor2 extends EditorPane {
 		this.searchWidget.setValue(query.trim());
 	}
 
-	private updateInputAriaLabel(lastSyncedLabel: string) {
-		const label = lastSyncedLabel ?
-			`${searchBoxLabel}. ${lastSyncedLabel}` :
-			searchBoxLabel;
+	private updateInputAriaLabel() {
+		let label = searchBoxLabel;
+		if (this.searchResultLabel) {
+			label += `. ${this.searchResultLabel}`;
+		}
+
+		if (this.lastSyncedLabel) {
+			label += `. ${this.lastSyncedLabel}`;
+		}
+
 		this.searchWidget.updateAriaLabel(label);
 	}
 
@@ -475,10 +484,19 @@ export class SettingsEditor2 extends EditorPane {
 		this.settingsTargetsWidget = this._register(this.instantiationService.createInstance(SettingsTargetsWidget, targetWidgetContainer, { enableRemoteSettings: true }));
 		this.settingsTargetsWidget.settingsTarget = ConfigurationTarget.USER_LOCAL;
 		this.settingsTargetsWidget.onDidTargetChange(target => this.onDidSettingsTargetChange(target));
+		this._register(DOM.addDisposableListener(targetWidgetContainer, DOM.EventType.KEY_DOWN, e => {
+			const event = new StandardKeyboardEvent(e);
+			if (event.keyCode === KeyCode.DownArrow) {
+				this.focusSettings();
+			}
+		}));
 
 		if (this.userDataSyncWorkbenchService.enabled && this.userDataAutoSyncService.canToggleEnablement()) {
 			const syncControls = this._register(this.instantiationService.createInstance(SyncControls, headerControlsContainer));
-			this._register(syncControls.onDidChangeLastSyncedLabel(lastSyncedLabel => this.updateInputAriaLabel(lastSyncedLabel)));
+			this._register(syncControls.onDidChangeLastSyncedLabel(lastSyncedLabel => {
+				this.lastSyncedLabel = lastSyncedLabel;
+				this.updateInputAriaLabel();
+			}));
 		}
 
 		this.controlsElement = DOM.append(searchContainer, DOM.$('.settings-clear-widget'));
@@ -686,8 +704,10 @@ export class SettingsEditor2 extends EditorPane {
 		}));
 
 		this._register(this.settingsTree.onDidFocus(() => {
-			this._currentFocusContext = SettingsFocusContext.SettingTree;
-			this.settingRowFocused.set(true);
+			if (document.activeElement?.classList.contains('monaco-list')) {
+				this._currentFocusContext = SettingsFocusContext.SettingTree;
+				this.settingRowFocused.set(true);
+			}
 		}));
 
 		this._register(this.settingsTree.onDidBlur(() => {
@@ -1307,6 +1327,7 @@ export class SettingsEditor2 extends EditorPane {
 
 		if (!this.searchResultModel) {
 			if (this.countElement.style.display !== 'none') {
+				this.searchResultLabel = null;
 				this.countElement.style.display = 'none';
 				this.layout(this.dimension);
 			}
@@ -1317,11 +1338,17 @@ export class SettingsEditor2 extends EditorPane {
 
 		if (this.tocTreeModel && this.tocTreeModel.settingsTreeRoot) {
 			const count = this.tocTreeModel.settingsTreeRoot.count;
+			let resultString: string;
 			switch (count) {
-				case 0: this.countElement.innerText = localize('noResults', "No Settings Found"); break;
-				case 1: this.countElement.innerText = localize('oneResult', "1 Setting Found"); break;
-				default: this.countElement.innerText = localize('moreThanOneResult', "{0} Settings Found", count);
+				case 0: resultString = localize('noResults', "No Settings Found"); break;
+				case 1: resultString = localize('oneResult', "1 Setting Found"); break;
+				default: resultString = localize('moreThanOneResult', "{0} Settings Found", count);
 			}
+
+			this.searchResultLabel = resultString;
+			this.updateInputAriaLabel();
+			this.countElement.innerText = resultString;
+			aria.status(resultString);
 
 			if (this.countElement.style.display !== 'block') {
 				this.countElement.style.display = 'block';

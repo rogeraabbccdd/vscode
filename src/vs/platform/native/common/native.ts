@@ -5,10 +5,9 @@
 
 import { Event } from 'vs/base/common/event';
 import { MessageBoxOptions, MessageBoxReturnValue, OpenDevToolsOptions, SaveDialogOptions, OpenDialogOptions, OpenDialogReturnValue, SaveDialogReturnValue, MouseInputEvent } from 'vs/base/parts/sandbox/common/electronTypes';
-import { IOpenedWindow, IWindowOpenable, IOpenEmptyWindowOptions, IOpenWindowOptions } from 'vs/platform/windows/common/windows';
+import { IOpenedWindow, IWindowOpenable, IOpenEmptyWindowOptions, IOpenWindowOptions, IColorScheme } from 'vs/platform/windows/common/windows';
 import { INativeOpenDialogOptions } from 'vs/platform/dialogs/common/dialogs';
 import { ISerializableCommandAction } from 'vs/platform/actions/common/actions';
-import { ColorScheme } from 'vs/platform/theme/common/theme';
 import { URI } from 'vs/base/common/uri';
 
 export interface ICPUProperties {
@@ -48,7 +47,7 @@ export interface ICommonNativeHostService {
 
 	readonly onOSResume: Event<unknown>;
 
-	readonly onColorSchemeChange: Event<ColorScheme>;
+	readonly onColorSchemeChange: Event<IColorScheme>;
 
 	// Window
 	getWindows(): Promise<IOpenedWindow[]>;
@@ -150,4 +149,5 @@ export interface ICommonNativeHostService {
 	deletePassword(service: string, account: string): Promise<boolean>;
 	findPassword(service: string): Promise<string | null>;
 	findCredentials(service: string): Promise<Array<{ account: string, password: string }>>
+	readonly onDidChangePassword: Event<void>;
 }

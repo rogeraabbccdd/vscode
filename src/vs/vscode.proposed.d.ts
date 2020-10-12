@@ -143,6 +143,31 @@ declare module 'vscode' {
 		* provider
 		*/
 		export function logout(providerId: string, sessionId: string): Thenable<void>;
+
+		/**
+		 * Retrieve a password that was stored with key. Returns undefined if there
+		 * is no password matching that key.
+		 * @param key The key the password was stored under.
+		 */
+		export function getPassword(key: string): Thenable<string | undefined>;
+
+		/**
+		 * Store a password under a given key.
+		 * @param key The key to store the password under
+		 * @param value The password
+		 */
+		export function setPassword(key: string, value: string): Thenable<void>;
+
+		/**
+		 * Remove a password from storage.
+		 * @param key The key the password was stored under.
+		 */
+		export function deletePassword(key: string): Thenable<void>;
+
+		/**
+		 * Fires when a password is set or deleted.
+		 */
+		export const onDidChangePassword: Event<void>;
 	}
 
 	//#endregion
@@ -1486,16 +1511,6 @@ declare module 'vscode' {
 		readonly viewColumn?: ViewColumn;
 
 		/**
-		 * Whether the panel is active (focused by the user).
-		 */
-		readonly active: boolean;
-
-		/**
-		 * Whether the panel is visible.
-		 */
-		readonly visible: boolean;
-
-		/**
 		 * Fired when the panel is disposed.
 		 */
 		readonly onDidDispose: Event<void>;
@@ -1673,7 +1688,7 @@ declare module 'vscode' {
 		/**
 		 * Unique identifier for the backup.
 		 *
-		 * This id is passed back to your extension in `openCustomDocument` when opening a notebook editor from a backup.
+		 * This id is passed back to your extension in `openNotebook` when opening a notebook editor from a backup.
 		 */
 		readonly id: string;
 
@@ -1831,6 +1846,7 @@ declare module 'vscode' {
 		): Disposable;
 
 		export function createNotebookEditorDecorationType(options: NotebookDecorationRenderOptions): NotebookEditorDecorationType;
+		export function openNotebookDocument(uri: Uri, viewType?: string): Promise<NotebookDocument>;
 		export const onDidOpenNotebookDocument: Event<NotebookDocument>;
 		export const onDidCloseNotebookDocument: Event<NotebookDocument>;
 		export const onDidSaveNotebookDocument: Event<NotebookDocument>;
@@ -1839,14 +1855,6 @@ declare module 'vscode' {
 		 * All currently known notebook documents.
 		 */
 		export const notebookDocuments: ReadonlyArray<NotebookDocument>;
-
-		export const visibleNotebookEditors: NotebookEditor[];
-		export const onDidChangeVisibleNotebookEditors: Event<NotebookEditor[]>;
-
-		export const activeNotebookEditor: NotebookEditor | undefined;
-		export const onDidChangeActiveNotebookEditor: Event<NotebookEditor | undefined>;
-		export const onDidChangeNotebookEditorSelection: Event<NotebookEditorSelectionChangeEvent>;
-		export const onDidChangeNotebookEditorVisibleRanges: Event<NotebookEditorVisibleRangesChangeEvent>;
 		export const onDidChangeNotebookDocumentMetadata: Event<NotebookDocumentMetadataChangeEvent>;
 		export const onDidChangeNotebookCells: Event<NotebookCellsChangeEvent>;
 		export const onDidChangeCellOutputs: Event<NotebookCellOutputsChangeEvent>;
@@ -1873,6 +1881,15 @@ declare module 'vscode' {
 		 * @return A new status bar item.
 		 */
 		export function createCellStatusBarItem(cell: NotebookCell, alignment?: NotebookCellStatusBarAlignment, priority?: number): NotebookCellStatusBarItem;
+	}
+
+	export namespace window {
+		export const visibleNotebookEditors: NotebookEditor[];
+		export const onDidChangeVisibleNotebookEditors: Event<NotebookEditor[]>;
+		export const activeNotebookEditor: NotebookEditor | undefined;
+		export const onDidChangeActiveNotebookEditor: Event<NotebookEditor | undefined>;
+		export const onDidChangeNotebookEditorSelection: Event<NotebookEditorSelectionChangeEvent>;
+		export const onDidChangeNotebookEditorVisibleRanges: Event<NotebookEditorVisibleRangesChangeEvent>;
 	}
 
 	//#endregion
@@ -2163,9 +2180,9 @@ declare module 'vscode' {
 	export interface CommentThread {
 		/**
 		 * Whether the thread supports reply.
-		 * Defaults to false.
+		 * Defaults to true.
 		 */
-		readOnly: boolean;
+		canReply: boolean;
 	}
 	//#endregion
 }
