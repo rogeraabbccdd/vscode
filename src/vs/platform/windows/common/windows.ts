@@ -116,6 +116,7 @@ export interface IWindowSettings {
 	enableMenuBarMnemonics: boolean;
 	closeWhenEmpty: boolean;
 	clickThroughInactive: boolean;
+	enableExperimentalProxyLoginDialog: boolean;
 	transparent: boolean;
 	compositionAttribute: 'none' | 'transparent' | 'blur' | 'acrylic';
 	vibrancy: 'none' | 'appearance-based' | 'light' | 'dark' | 'titlebar' | 'medium-light' | 'ultra-dark';
