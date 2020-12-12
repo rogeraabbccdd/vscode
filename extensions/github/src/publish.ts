@@ -149,7 +149,7 @@ export async function publishRepository(gitAPI: GitAPI, repository?: Repository)
 					new Promise<undefined>(c => quickpick.onDidHide(() => c(undefined)))
 				]);
 
-				if (!result) {
+				if (!result || result.length === 0) {
 					return;
 				}
 
@@ -202,9 +202,9 @@ export async function publishRepository(gitAPI: GitAPI, repository?: Repository)
 	}
 
 	const openInGitHub = 'Open In GitHub';
-	const action = await vscode.window.showInformationMessage(`Successfully published the '${owner}/${repo}' repository on GitHub.`, openInGitHub);
-
-	if (action === openInGitHub) {
-		vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(githubRepository.html_url));
-	}
+	vscode.window.showInformationMessage(`Successfully published the '${owner}/${repo}' repository on GitHub.`, openInGitHub).then(action => {
+		if (action === openInGitHub) {
+			vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(githubRepository.html_url));
+		}
+	});
 }

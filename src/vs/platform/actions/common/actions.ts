@@ -95,7 +95,7 @@ export class MenuId {
 	static readonly MenubarSwitchGroupMenu = new MenuId('MenubarSwitchGroupMenu');
 	static readonly MenubarTerminalMenu = new MenuId('MenubarTerminalMenu');
 	static readonly MenubarViewMenu = new MenuId('MenubarViewMenu');
-	static readonly MenubarWebNavigationMenu = new MenuId('MenubarWebNavigationMenu');
+	static readonly MenubarHomeMenu = new MenuId('MenubarHomeMenu');
 	static readonly OpenEditorsContext = new MenuId('OpenEditorsContext');
 	static readonly ProblemsPanelContext = new MenuId('ProblemsPanelContext');
 	static readonly SCMChangeContext = new MenuId('SCMChangeContext');
@@ -112,6 +112,7 @@ export class MenuId {
 	static readonly TunnelInline = new MenuId('TunnelInline');
 	static readonly TunnelTitle = new MenuId('TunnelTitle');
 	static readonly ViewItemContext = new MenuId('ViewItemContext');
+	static readonly ViewContainerTitle = new MenuId('ViewContainerTitle');
 	static readonly ViewContainerTitleContext = new MenuId('ViewContainerTitleContext');
 	static readonly ViewTitle = new MenuId('ViewTitle');
 	static readonly ViewTitleContext = new MenuId('ViewTitleContext');

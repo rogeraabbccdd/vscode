@@ -62,6 +62,8 @@ import { IExtensionIgnoredRecommendationsService } from 'vs/workbench/services/e
 import { ExtensionIgnoredRecommendationsService } from 'vs/workbench/services/extensionRecommendations/common/extensionIgnoredRecommendationsService';
 import { IExtensionRecommendationNotificationService } from 'vs/platform/extensionRecommendations/common/extensionRecommendations';
 import { ExtensionRecommendationNotificationService } from 'vs/workbench/contrib/extensions/browser/extensionRecommendationNotificationService';
+import { IContextKeyService } from 'vs/platform/contextkey/common/contextkey';
+import { MockContextKeyService } from 'vs/platform/keybinding/test/common/mockKeybindingService';
 
 const mockExtensionGallery: IGalleryExtension[] = [
 	aGalleryExtension('MockExtension1', {
@@ -203,6 +205,7 @@ suite('ExtensionRecommendationsService Test', () => {
 		testConfigurationService = new TestConfigurationService();
 		instantiationService.stub(IConfigurationService, testConfigurationService);
 		instantiationService.stub(INotificationService, new TestNotificationService());
+		instantiationService.stub(IContextKeyService, new MockContextKeyService());
 		instantiationService.stub(IExtensionManagementService, <Partial<IExtensionManagementService>>{
 			onInstallExtension: installEvent.event,
 			onDidInstallExtension: didInstallEvent.event,
@@ -271,7 +274,7 @@ suite('ExtensionRecommendationsService Test', () => {
 
 		instantiationService.stub(INotificationService, new TestNotificationService2());
 
-		testConfigurationService.setUserConfiguration(ConfigurationKey, { ignoreRecommendations: false, showRecommendationsOnlyOnDemand: false });
+		testConfigurationService.setUserConfiguration(ConfigurationKey, { ignoreRecommendations: false });
 		instantiationService.stub(IModelService, <IModelService>{
 			getModels(): any { return []; },
 			onModelAdded: onModelAddedEvent.event
@@ -304,14 +307,14 @@ suite('ExtensionRecommendationsService Test', () => {
 		}, null, '\t'));
 
 		const myWorkspace = testWorkspace(URI.from({ scheme: 'file', path: folderDir }));
+		const fileService = new FileService(new NullLogService());
+		fileService.registerProvider(Schemas.file, new DiskFileSystemProvider(new NullLogService()));
+		instantiationService.stub(IFileService, fileService);
 		workspaceService = new TestContextService(myWorkspace);
 		instantiationService.stub(IWorkspaceContextService, workspaceService);
 		instantiationService.stub(IWorkpsaceExtensionsConfigService, instantiationService.createInstance(WorkspaceExtensionsConfigService));
 		instantiationService.stub(IExtensionIgnoredRecommendationsService, instantiationService.createInstance(ExtensionIgnoredRecommendationsService));
 		instantiationService.stub(IExtensionRecommendationNotificationService, instantiationService.createInstance(ExtensionRecommendationNotificationService));
-		const fileService = new FileService(new NullLogService());
-		fileService.registerProvider(Schemas.file, new DiskFileSystemProvider(new NullLogService()));
-		instantiationService.stub(IFileService, fileService);
 	}
 
 	function testNoPromptForValidRecommendations(recommendations: string[]) {
@@ -381,6 +384,16 @@ suite('ExtensionRecommendationsService Test', () => {
 		return testNoPromptForValidRecommendations(mockTestData.validRecommendedExtensions);
 	});
 
+	test('ExtensionRecommendationsService: No Prompt for valid workspace recommendations if ignoreRecommendations is set', () => {
+		testConfigurationService.setUserConfiguration(ConfigurationKey, { ignoreRecommendations: true });
+		return setUpFolderWorkspace('myFolder', mockTestData.validRecommendedExtensions).then(() => {
+			testObject = instantiationService.createInstance(ExtensionRecommendationsService);
+			return testObject.activationPromise.then(() => {
+				assert.ok(!prompted);
+			});
+		});
+	});
+
 	test('ExtensionRecommendationsService: No Prompt for valid workspace recommendations if showRecommendationsOnlyOnDemand is set', () => {
 		testConfigurationService.setUserConfiguration(ConfigurationKey, { showRecommendationsOnlyOnDemand: true });
 		return setUpFolderWorkspace('myFolder', mockTestData.validRecommendedExtensions).then(() => {
@@ -392,14 +405,14 @@ suite('ExtensionRecommendationsService Test', () => {
 	});
 
 	test('ExtensionRecommendationsService: No Prompt for valid workspace recommendations if ignoreRecommendations is set for current workspace', () => {
-		instantiationService.get(IStorageService).store2('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
 		return testNoPromptForValidRecommendations(mockTestData.validRecommendedExtensions);
 	});
 
 	test('ExtensionRecommendationsService: No Recommendations of globally ignored recommendations', () => {
-		instantiationService.get(IStorageService).store2('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
-		instantiationService.get(IStorageService).store2('extensionsAssistant/recommendations', '["ms-dotnettools.csharp", "ms-python.python", "ms-vscode.vscode-typescript-tslint-plugin"]', StorageScope.GLOBAL, StorageTarget.MACHINE);
-		instantiationService.get(IStorageService).store2('extensionsAssistant/ignored_recommendations', '["ms-dotnettools.csharp", "mockpublisher2.mockextension2"]', StorageScope.GLOBAL, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/recommendations', '["ms-dotnettools.csharp", "ms-python.python", "ms-vscode.vscode-typescript-tslint-plugin"]', StorageScope.GLOBAL, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/ignored_recommendations', '["ms-dotnettools.csharp", "mockpublisher2.mockextension2"]', StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		return setUpFolderWorkspace('myFolder', mockTestData.validRecommendedExtensions).then(() => {
 			testObject = instantiationService.createInstance(ExtensionRecommendationsService);
@@ -416,8 +429,8 @@ suite('ExtensionRecommendationsService Test', () => {
 	test('ExtensionRecommendationsService: No Recommendations of workspace ignored recommendations', () => {
 		const ignoredRecommendations = ['ms-dotnettools.csharp', 'mockpublisher2.mockextension2']; // ignore a stored recommendation and a workspace recommendation.
 		const storedRecommendations = '["ms-dotnettools.csharp", "ms-python.python"]';
-		instantiationService.get(IStorageService).store2('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
-		instantiationService.get(IStorageService).store2('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		return setUpFolderWorkspace('myFolder', mockTestData.validRecommendedExtensions, ignoredRecommendations).then(() => {
 			testObject = instantiationService.createInstance(ExtensionRecommendationsService);
@@ -437,9 +450,9 @@ suite('ExtensionRecommendationsService Test', () => {
 		const workspaceIgnoredRecommendations = ['ms-dotnettools.csharp']; // ignore a stored recommendation and a workspace recommendation.
 		const storedRecommendations = '["ms-dotnettools.csharp", "ms-python.python"]';
 		const globallyIgnoredRecommendations = '["mockpublisher2.mockextension2"]'; // ignore a workspace recommendation.
-		storageService.store2('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
-		storageService.store2('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
-		storageService.store2('extensionsAssistant/ignored_recommendations', globallyIgnoredRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/ignored_recommendations', globallyIgnoredRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		await setUpFolderWorkspace('myFolder', mockTestData.validRecommendedExtensions, workspaceIgnoredRecommendations);
 		testObject = instantiationService.createInstance(ExtensionRecommendationsService);
@@ -456,9 +469,9 @@ suite('ExtensionRecommendationsService Test', () => {
 
 		const storedRecommendations = '["ms-dotnettools.csharp", "ms-python.python"]';
 		const globallyIgnoredRecommendations = '["mockpublisher2.mockextension2"]'; // ignore a workspace recommendation.
-		storageService.store2('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
-		storageService.store2('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
-		storageService.store2('extensionsAssistant/ignored_recommendations', globallyIgnoredRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/ignored_recommendations', globallyIgnoredRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		await setUpFolderWorkspace('myFolder', mockTestData.validRecommendedExtensions);
 		const extensionIgnoredRecommendationsService = instantiationService.get(IExtensionIgnoredRecommendationsService);
@@ -490,8 +503,8 @@ suite('ExtensionRecommendationsService Test', () => {
 		const changeHandlerTarget = sinon.spy();
 		const ignoredExtensionId = 'Some.Extension';
 
-		storageService.store2('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
-		storageService.store2('extensionsAssistant/ignored_recommendations', '["ms-vscode.vscode"]', StorageScope.GLOBAL, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/workspaceRecommendationsIgnore', true, StorageScope.WORKSPACE, StorageTarget.MACHINE);
+		storageService.store('extensionsAssistant/ignored_recommendations', '["ms-vscode.vscode"]', StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		await setUpFolderWorkspace('myFolder', []);
 		testObject = instantiationService.createInstance(ExtensionRecommendationsService);
@@ -506,7 +519,7 @@ suite('ExtensionRecommendationsService Test', () => {
 
 	test('ExtensionRecommendationsService: Get file based recommendations from storage (old format)', () => {
 		const storedRecommendations = '["ms-dotnettools.csharp", "ms-python.python", "ms-vscode.vscode-typescript-tslint-plugin"]';
-		instantiationService.get(IStorageService).store2('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		return setUpFolderWorkspace('myFolder', []).then(() => {
 			testObject = instantiationService.createInstance(ExtensionRecommendationsService);
@@ -525,7 +538,7 @@ suite('ExtensionRecommendationsService Test', () => {
 		const now = Date.now();
 		const tenDaysOld = 10 * milliSecondsInADay;
 		const storedRecommendations = `{"ms-dotnettools.csharp": ${now}, "ms-python.python": ${now}, "ms-vscode.vscode-typescript-tslint-plugin": ${now}, "lukehoban.Go": ${tenDaysOld}}`;
-		instantiationService.get(IStorageService).store2('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
+		instantiationService.get(IStorageService).store('extensionsAssistant/recommendations', storedRecommendations, StorageScope.GLOBAL, StorageTarget.MACHINE);
 
 		return setUpFolderWorkspace('myFolder', []).then(() => {
 			testObject = instantiationService.createInstance(ExtensionRecommendationsService);

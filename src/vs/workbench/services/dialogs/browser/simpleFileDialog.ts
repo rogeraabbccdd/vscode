@@ -221,7 +221,7 @@ export class SimpleFileDialog {
 	}
 
 	private getScheme(available: readonly string[] | undefined, defaultUri: URI | undefined): string {
-		if (available) {
+		if (available && available.length > 0) {
 			if (defaultUri && (available.indexOf(defaultUri.scheme) >= 0)) {
 				return defaultUri.scheme;
 			}
@@ -924,7 +924,8 @@ export class SimpleFileDialog {
 			const ext = resources.extname(file);
 			for (let i = 0; i < this.options.filters.length; i++) {
 				for (let j = 0; j < this.options.filters[i].extensions.length; j++) {
-					if (ext === ('.' + this.options.filters[i].extensions[j])) {
+					const testExt = this.options.filters[i].extensions[j];
+					if ((testExt === '*') || (ext === ('.' + testExt))) {
 						return true;
 					}
 				}
