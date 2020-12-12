@@ -239,7 +239,9 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 				this._win.setSheetOffset(22); // offset dialogs by the height of the custom title bar if we have any
 			}
 
-			this.applyTransparency(windowConfig);
+			if (windowConfig) {
+				this.applyTransparency(windowConfig);
+			}
 
 			// TODO@Ben (Electron 4 regression): when running on multiple displays where the target display
 			// to open the window has a larger resolution than the primary display, the window will not size
