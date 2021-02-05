@@ -15,7 +15,6 @@ import { IModelDecorationOptions, IModelDeltaDecoration, TrackedRangeStickiness,
 import { IInstantiationService } from 'vs/platform/instantiation/common/instantiation';
 import { IContextKeyService, IContextKey } from 'vs/platform/contextkey/common/contextkey';
 import { IContextMenuService } from 'vs/platform/contextview/browser/contextView';
-import { RemoveBreakpointAction } from 'vs/workbench/contrib/debug/browser/debugActions';
 import { IDebugService, IBreakpoint, CONTEXT_BREAKPOINT_WIDGET_VISIBLE, BreakpointWidgetContext, IBreakpointEditorContribution, IBreakpointUpdateData, IDebugConfiguration, State, IDebugSession } from 'vs/workbench/contrib/debug/common/debug';
 import { IMarginData } from 'vs/editor/browser/controller/mouseTarget';
 import { IDialogService } from 'vs/platform/dialogs/common/dialogs';
@@ -173,6 +172,24 @@ export class BreakpointEditorContribution implements IBreakpointEditorContributi
 		this.setDecorationsScheduler.schedule();
 	}
 
+	/**
+	 * Returns context menu actions at the line number if breakpoints can be
+	 * set. This is used by the {@link TestingDecorations} to allow breakpoint
+	 * setting on lines where breakpoint "run" actions are present.
+	 */
+	public getContextMenuActionsAtPosition(lineNumber: number, model: ITextModel) {
+		if (!this.debugService.getAdapterManager().hasDebuggers()) {
+			return [];
+		}
+
+		if (!this.debugService.canSetBreakpointsIn(model)) {
+			return [];
+		}
+
+		const breakpoints = this.debugService.getModel().getBreakpoints({ lineNumber, uri: model.uri });
+		return this.getContextMenuActions(breakpoints, model.uri, lineNumber);
+	}
+
 	private registerListeners(): void {
 		this.toDispose.push(this.editor.onMouseDown(async (e: IEditorMouseEvent) => {
 			if (!this.debugService.getAdapterManager().hasDebuggers()) {
@@ -301,7 +318,9 @@ export class BreakpointEditorContribution implements IBreakpointEditorContributi
 		const actions: IAction[] = [];
 		if (breakpoints.length === 1) {
 			const breakpointType = breakpoints[0].logMessage ? nls.localize('logPoint', "Logpoint") : nls.localize('breakpoint', "Breakpoint");
-			actions.push(new RemoveBreakpointAction(RemoveBreakpointAction.ID, nls.localize('removeBreakpoint', "Remove {0}", breakpointType), this.debugService));
+			actions.push(new Action('debug.removeBreakpoint', nls.localize('removeBreakpoint', "Remove {0}", breakpointType), undefined, true, async () => {
+				await this.debugService.removeBreakpoints(breakpoints[0].getId());
+			}));
 			actions.push(new Action(
 				'workbench.debug.action.editBreakpointAction',
 				nls.localize('editBreakpoint', "Edit {0}...", breakpointType),
@@ -375,7 +394,8 @@ export class BreakpointEditorContribution implements IBreakpointEditorContributi
 		const decorations = this.editor.getLineDecorations(line);
 		if (decorations) {
 			for (const { options } of decorations) {
-				if (options.glyphMarginClassName && options.glyphMarginClassName.indexOf('codicon-') === -1) {
+				const clz = options.glyphMarginClassName;
+				if (clz && (!clz.includes('codicon-') || clz.includes('codicon-testing-'))) {
 					return false;
 				}
 			}

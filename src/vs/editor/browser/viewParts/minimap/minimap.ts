@@ -863,6 +863,7 @@ export class Minimap extends ViewPart implements IMinimapModel {
 		}
 	}
 	public onTokensColorsChanged(e: viewEvents.ViewTokensColorsChangedEvent): boolean {
+		this._onOptionsMaybeChanged();
 		return this._actual.onTokensColorsChanged();
 	}
 	public onZonesChanged(e: viewEvents.ViewZonesChangedEvent): boolean {
