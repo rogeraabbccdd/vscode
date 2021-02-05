@@ -299,7 +299,7 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		switch (attribute) {
 			case 'acrylic':
 				// Fluent/acrylic flag was introduced in Windows 10 build 17063 (between FCU and April 2018 update)
-				if (parseInt(os.release().split('.')[2]) >= 17063) {
+				if (parseInt(release().split('.')[2]) >= 17063) {
 					attribValue = ACCENT_STATE.ACCENT_ENABLE_ACRYLICBLURBEHIND;
 				}
 				break;
@@ -320,14 +320,14 @@ export class CodeWindow extends Disposable implements ICodeWindow {
 		let applied = false;
 
 		if (windowConfig) {
-			if (isWindows && parseFloat(os.release()) >= 10) {
+			if (isWindows && parseFloat(release()) >= 10) {
 				if (windowConfig.compositionAttribute && windowConfig.compositionAttribute !== 'none' && this.hasHiddenTitleBarStyle) {
 					this.setCompositionAttribute(windowConfig.compositionAttribute);
 					applied = true;
 				} else {
 					this.setCompositionAttribute('none');
 				}
-			} else if (isMacintosh && parseFloat(os.release()) >= 14) {
+			} else if (isMacintosh && parseFloat(release()) >= 14) {
 				if (windowConfig.vibrancy && windowConfig.vibrancy !== 'none') {
 					this._win.setVibrancy(windowConfig.vibrancy);
 					applied = true;
