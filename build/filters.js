@@ -87,6 +87,7 @@ module.exports.indentationFilter = [
 	'!**/*.dockerfile',
 	'!extensions/markdown-language-features/media/*.js',
 	'!extensions/simple-browser/media/*.js',
+	'!src/vs/workbench/contrib/fonts/browser/**',
 ];
 
 module.exports.copyrightFilter = [
@@ -118,6 +119,7 @@ module.exports.copyrightFilter = [
 	'!extensions/html-language-features/server/src/modes/typescript/*',
 	'!extensions/*/server/bin/*',
 	'!src/vs/editor/test/node/classification/typescript-test.ts',
+	'!src/vs/workbench/contrib/fonts/browser/**',
 ];
 
 module.exports.jsHygieneFilter = [
